@@ -46,7 +46,7 @@ export default function App() {
           ref={scrollRef}
           className={`no-scrollbar min-h-0 flex-1 ${frame === 'market' ? 'overflow-hidden' : 'overflow-y-auto'}`}
         >
-          {frame === 'market' && <MarketplaceFrame onOpen={setSheetModel} onRent={handleRent} />}
+          {frame === 'market' && <MarketplaceFrame onOpen={setSheetModel} />}
           {frame === 'session' && (
             <ActiveSessionFrame
               session={session}
@@ -73,7 +73,7 @@ export default function App() {
             <Icon name="vital_signs" size={16} /> Simulate anomaly
           </button>
         ) : frame === 'market' ? (
-          <span>Drag sideways to browse · swipe up or down to change area · tap a card for details</span>
+          <span>Drag sideways to browse · swipe up or down to change area · tap a card to rent</span>
         ) : null}
       </div>
     </div>

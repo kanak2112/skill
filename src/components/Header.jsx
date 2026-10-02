@@ -2,9 +2,9 @@ import Icon from './Icon.jsx';
 import { useSystemClock } from '../hooks/useSystemClock.js';
 
 const STATUS_META = {
-  active: { label: 'Patch connected', dot: 'bg-accent', pulse: true },
-  terminated: { label: 'Patch idle', dot: 'bg-muted', pulse: false },
-  complete: { label: 'Patch idle', dot: 'bg-muted', pulse: false },
+  active: { label: 'Patch connected', icon: 'sensors', tone: 'text-accent' },
+  terminated: { label: 'Patch idle', icon: 'sensors_off', tone: 'text-muted' },
+  complete: { label: 'Patch idle', icon: 'sensors_off', tone: 'text-muted' },
 };
 
 function StatusRow() {
@@ -35,8 +35,8 @@ export default function Header({ sessionStatus }) {
       <StatusRow />
       <div className="flex items-center justify-between gap-3 px-5 pb-4 pt-1.5">
         <h1 className="text-header text-ink">Neural Skill Stream</h1>
-        <span className="flex items-center gap-2 text-caption text-muted">
-          <span className={`h-1.5 w-1.5 rounded-full ${meta.dot} ${meta.pulse ? 'animate-breathe' : ''}`} aria-hidden="true" />
+        <span className="flex items-center gap-1.5 text-caption text-muted">
+          <Icon name={meta.icon} size={16} className={meta.tone} />
           {meta.label}
         </span>
       </div>

@@ -20,11 +20,12 @@ npm run build
 - Search bar ("Search skills, tasks, or experts...") with simulated voice input and suggestion tags;
   results dim non-matches and bring the nearest match forward, across skill areas.
 - Filter tabs (All / Human experts / Combined / AI generated) work the same way.
-- Depth: side cards recede, scale to 82%, fade and blur slightly; they keep playing at a slower speed.
+- Depth: centre card 100%; neighbours 85% scale, 18° Y rotation, 65% opacity; cards further round
+  and other skill areas blur to 6px. Neighbours keep playing at a slower speed.
 - Tile treatments: **Personal** — cyan badge, gold verified crest, expert signature watermark.
   **Composite** — stacked layers + node-network overlay. **Synthetic** — rotating wireframe shimmer
   border, wireframe grid, "No single human owner" tag.
-- Tap any tile to lock it to centre and open the skill sheet (`SkillSheet.jsx`): preview, verified
+- Tap any tile to lock it to centre and open the rental sheet directly (`SkillSheet.jsx`): preview, verified
   badge, three key numbers (rating, fit, price), plain-English after-effects, and a collapsed
   "More details" section (expert, fit breakdown, pricing and daily limit, refunds, terms, safety).
   Waiting-list models show a pulsing queue card that counts down before "Rent for ₹…".

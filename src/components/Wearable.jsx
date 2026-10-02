@@ -18,7 +18,7 @@ export const LED = {
 };
 
 /**
- * The patch: a thin status ring around a touch stop control — the only way to
+ * The patch: a thin status ring around a touch stop control, the only way to
  * end a session from this screen. Hold for 3 s (3-2-1); the ring fills and
  * shifts from brass to coral. Letting go early cancels. Once complete the ring
  * drains before the skill is released, so the stop reads as deliberate.

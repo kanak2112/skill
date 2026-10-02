@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import Icon from '../components/Icon.jsx';
-import Wearable, { LED } from '../components/Wearable.jsx';
+import Wearable from '../components/Wearable.jsx';
 import { formatMMSS } from '../hooks/useSessionTimer.js';
 
 const HISTORY = 28;
@@ -36,26 +36,24 @@ function Sparkline({ series, min, max, tone }) {
   );
 }
 
+const STATE = {
+  active: { title: 'Skill active', icon: 'sensors', tone: 'text-accent' },
+  warning: { title: 'Adjusting', icon: 'vital_signs', tone: 'text-alert' },
+  disconnected: { title: 'Disconnected', icon: 'power_settings_new', tone: 'text-muted' },
+  off: { title: 'Session finished', icon: 'check_circle', tone: 'text-muted' },
+};
+
 function StatusBanner({ led, model }) {
-  const meta = {
-    active: { title: 'Skill active', sub: 'Running now', pulse: true },
-    warning: { title: 'Adjusting', sub: 'Running now', pulse: true },
-    disconnected: { title: 'Disconnected', sub: 'Skill stopped and removed', pulse: false },
-    off: { title: 'Session finished', sub: 'Skill removed', pulse: false },
-  }[led];
-  const name = model.expert ? `${model.expert} — ${model.title.replace(/ v\d.*$/, '')}` : model.title;
+  const state = STATE[led];
+  const source = model.expert ?? (model.trainedOn ? `Learned from ${model.trainedOn}` : 'AI generated');
   return (
     <div role="status">
-      <p className={`eyebrow flex items-center gap-2 ${LED[led].text}`}>
-        <span
-          className={`h-1.5 w-1.5 rounded-full ${meta.pulse ? 'animate-breathe' : ''}`}
-          style={{ background: LED[led].color }}
-          aria-hidden="true"
-        />
-        {meta.title}
+      <p className={`eyebrow flex items-center gap-1.5 ${state.tone}`}>
+        <Icon name={state.icon} size={16} />
+        {state.title}
       </p>
-      <p className="mt-2 text-[18px] font-medium leading-snug tracking-[-0.01em] text-ink">{name}</p>
-      <p className="mt-0.5 text-caption text-muted">{meta.sub}</p>
+      <p className="mt-2 text-[18px] font-medium leading-snug tracking-[-0.01em] text-ink">{model.title.replace(/ v\d.*$/, '')}</p>
+      <p className="mt-0.5 text-caption text-muted">{source}</p>
     </div>
   );
 }
@@ -75,7 +73,7 @@ function AnomalyAlert({ phase, progress }) {
       <div className="flex gap-2.5">
         <Icon name="vital_signs" size={18} className="text-alert" />
         <div className="min-w-0 flex-1">
-          <p className="text-title text-ink">Unusual muscle signals — adjusting automatically</p>
+          <p className="text-title text-ink">Unusual muscle signals. Adjusting automatically.</p>
           <p className="mt-0.5 text-caption text-muted">You may feel a slight twitch. No need to stop.</p>
           <div className="mt-3 h-0.5 overflow-hidden rounded-full bg-line">
             <div className="h-full rounded-full bg-alert transition-[width] duration-100" style={{ width: `${progress * 100}%` }} />
@@ -128,7 +126,7 @@ function Telemetry({ session, anomaly }) {
             <dd className="flex items-center gap-3">
               {live && <Sparkline series={r.reading.series} min={r.min} max={r.max} tone={r.warn ? 'text-alert' : 'text-muted'} />}
               <span className={`w-14 text-right text-[15px] ${r.warn ? 'text-alert' : 'text-ink'}`}>
-                {r.reading.value == null ? '—' : `${Math.round(r.reading.value)} ${r.unit}`}
+                {r.reading.value == null ? 'Off' : `${Math.round(r.reading.value)} ${r.unit}`}
               </span>
             </dd>
           </div>
@@ -154,14 +152,10 @@ export default function ActiveSessionFrame({ session, anomaly, onTerminate, onVi
         <div className="mt-4 flex justify-center">
           <Wearable led={led} onKill={onTerminate} disabled={!live} />
         </div>
-        <ul className="mt-5 flex justify-center gap-5 text-caption">
-          {['active', 'warning', 'disconnected'].map((k) => (
-            <li key={k} className={`flex items-center gap-1.5 ${led === k ? 'text-ink' : 'text-muted'}`}>
-              <span className="h-1.5 w-1.5 rounded-full" style={{ background: LED[k].color, opacity: led === k ? 1 : 0.45 }} />
-              {LED[k].label}
-            </li>
-          ))}
-        </ul>
+        <p className={`mt-4 flex items-center justify-center gap-1.5 text-caption ${STATE[led].tone}`}>
+          <Icon name={STATE[led].icon} size={16} />
+          {led === 'active' ? 'Ring on: skill running' : led === 'warning' ? 'Ring pulsing: adjusting signals' : 'Ring off: skill removed'}
+        </p>
       </section>
 
       {!live && (

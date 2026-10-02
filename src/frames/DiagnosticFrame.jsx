@@ -4,7 +4,7 @@ import Icon from '../components/Icon.jsx';
 const SESSION_ID = '88492';
 
 const AFTER_EFFECTS = [
-  { key: 'tremor', icon: 'back_hand', title: 'Hand tremor (temporary)', note: 'Mild shaking when your hands are at rest', value: '14', unit: 'h' },
+  { key: 'tremor', icon: 'vibration', title: 'Hand tremor (temporary)', note: 'Mild shaking when your hands are at rest', value: '14', unit: 'h' },
   { key: 'speech', icon: 'record_voice_over', title: 'Speech habits (temporary)', note: "The expert's rhythm of speaking may linger", value: '+18', unit: 'h' },
 ];
 
@@ -86,7 +86,7 @@ function LossTrack() {
 export default function DiagnosticFrame({ session, onDone }) {
   const [exported, setExported] = useState(false);
   const { model } = session;
-  const skill = model.expert ? `${model.expert} — ${model.title.replace(/ v\d.*$/, '')}` : model.title;
+  const skill = model.expert ? `${model.title.replace(/ v\d.*$/, '')} • ${model.expert}` : model.title;
 
   const handleExport = () => {
     exportData(skill);
@@ -96,16 +96,10 @@ export default function DiagnosticFrame({ session, onDone }) {
 
   return (
     <div className="space-y-6 p-5">
-      <header>
-        <h2 className="text-header text-ink">Session summary</h2>
-        <p className="mt-1.5 text-[14px] text-muted">{skill}</p>
-        <p className="mt-0.5 text-caption text-muted">
-          <span className="tabular-nums">1</span>h <span className="tabular-nums">00</span>m · Session {SESSION_ID}
-        </p>
-      </header>
-
       <section className="card space-y-6 p-5">
-        <p className="eyebrow">How it went</p>
+        <p className="eyebrow">
+          How it went · <span className="tabular-nums">1</span>h <span className="tabular-nums">00</span>m
+        </p>
         <Metric label="How well you did" hint="With the skill running" value="99.2%" pct={99.2} tone="bg-accent" />
         <Metric label="What you kept" hint="Learned for yourself" value="2.1%" pct={2.1} tone="bg-muted" />
       </section>
@@ -115,7 +109,7 @@ export default function DiagnosticFrame({ session, onDone }) {
         <ul className="card divide-y divide-line px-5">
           {AFTER_EFFECTS.map((t) => (
             <li key={t.key} className="flex items-center gap-3 py-4">
-              <Icon name={t.icon} size={20} className="text-muted" />
+              <Icon name={t.icon} size={16} className="text-muted" />
               <div className="min-w-0 flex-1">
                 <p className="text-title text-ink">{t.title}</p>
                 <p className="text-caption text-muted">{t.note}</p>

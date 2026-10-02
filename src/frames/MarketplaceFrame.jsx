@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import Icon from '../components/Icon.jsx';
 import VaultTile from '../components/VaultTile.jsx';
-import { TypeBadge } from '../components/ModelVisuals.jsx';
-import { DOMAINS, MODELS_BY_DOMAIN, MODEL_TYPES, SUGGESTIONS, formatWait, inr, matchesQuery } from '../data/catalog.js';
+import { DOMAINS, MODELS_BY_DOMAIN, MODEL_TYPES, SUGGESTIONS, matchesQuery } from '../data/catalog.js';
 import { mod, normDeg, useCylinder } from '../hooks/useCylinder.js';
 
 const SLOTS = 8;
@@ -13,8 +12,6 @@ const modelAt = (row, slot) => {
   const list = MODELS_BY_DOMAIN[DOMAINS[mod(row, DOMAINS.length)].id];
   return list[mod(slot, list.length)];
 };
-
-export const skillName = (m) => (m.expert ? `${m.expert} — ${m.title.replace(/ v\d.*$/, '')}` : m.title);
 
 function SearchBar({ query, onQuery }) {
   const [listening, setListening] = useState(false);
@@ -78,7 +75,7 @@ function Suggestions({ query, onQuery }) {
             key={s}
             onClick={() => onQuery(on ? '' : s)}
             aria-pressed={on}
-            className={`h-7 shrink-0 rounded-full px-3 text-[12px] transition-colors ${
+            className={`h-7 shrink-0 rounded-lg px-3 text-[12px] transition-colors ${
               on ? 'bg-accent/15 text-accent' : 'bg-surface text-muted hover:text-ink'
             }`}
           >
@@ -118,7 +115,7 @@ function DomainRail({ centerRow, onJump }) {
   const current = mod(centerRow, DOMAINS.length);
   return (
     <div
-      className="absolute right-1.5 top-1/2 z-20 flex -translate-y-1/2 flex-col gap-1.5 rounded-full bg-canvas/70 px-0.5 py-1.5 backdrop-blur-sm"
+      className="absolute right-1.5 top-1/2 z-20 flex -translate-y-1/2 flex-col gap-1.5"
       role="tablist"
       aria-label="Skill area"
     >
@@ -142,7 +139,7 @@ function DomainRail({ centerRow, onJump }) {
   );
 }
 
-export default function MarketplaceFrame({ onOpen, onRent }) {
+export default function MarketplaceFrame({ onOpen }) {
   const stageRef = useRef(null);
   const [size, setSize] = useState({ w: 390, h: 440 });
   const [filter, setFilter] = useState('all');
@@ -156,12 +153,12 @@ export default function MarketplaceFrame({ onOpen, onRent }) {
     return () => ro.disconnect();
   }, []);
 
-  const tileW = Math.round(Math.min(168, size.w * 0.42, (size.h * 0.7) / 1.4));
+  const tileW = Math.round(Math.min(184, size.w * 0.46, (size.h * 0.68) / 1.4));
   const tileH = Math.round(tileW * 1.4);
   const stepRad = (2 * Math.PI) / SLOTS;
   const spacing = tileW + 12;
   const radius = spacing / stepRad;
-  const rowPx = tileH + 36;
+  const rowPx = tileH + 14;
 
   const matches = useCallback(
     (m) => (filter === 'all' || m.type === filter) && matchesQuery(m, query),
@@ -251,13 +248,19 @@ export default function MarketplaceFrame({ onOpen, onRent }) {
       const rel = normDeg(i * cyl.step - cyl.rot);
       if (Math.abs(rel) > 100) continue;
       const r = (rel * Math.PI) / 180;
-      const side = Math.min(Math.abs(rel) / 45, 1.6); // 0 at centre, 1 at the neighbouring slot
+      // side: 0 at centre, 1 at the neighbouring slot, >1 for cards further round the wall.
+      const side = Math.min(Math.abs(rel) / 45, 2);
+      const near = Math.min(side, 1);
+      const far = Math.max(side - 1, 0);
       const x = radius * Math.sin(r);
-      const z = -radius * (1 - Math.cos(r)) * 0.9; // side tiles recede into the chamber wall
-      const scale = 1 - Math.min(side, 1.3) * 0.18; // 100% centre → 82% neighbours
+      const z = -radius * (1 - Math.cos(r)) * 0.9;
+      const scale = 1 - near * 0.15 - far * 0.1; // 1.0 → 0.85 → smaller
+      const rotY = -Math.sign(rel) * (near * 18 + far * 10); // 0° → 18° facing the viewer
+      const depthOpacity = 1 - near * 0.35 - far * 0.35; // 1.0 → 0.65 → fading
+      const rowOff = Math.min(Math.abs(dk), 1);
+      const blur = Math.min(6, far * 6 + rowOff * 6); // background cards and other rows: up to 6px
       const m = modelAt(k, i);
       const on = matches(m);
-      const blur = side > 0.15 ? Math.min(side, 1.3) * 2.5 : 0;
       tiles.push(
         <div
           key={i}
@@ -269,9 +272,9 @@ export default function MarketplaceFrame({ onOpen, onRent }) {
             height: tileH,
             marginLeft: -tileW / 2,
             marginTop: -tileH / 2,
-            transform: `translate3d(${x}px,0,${z}px) rotateY(${-rel / 3}deg) scale(${scale})`,
-            opacity: (on ? 1 : 0.14) * (1 - Math.min(side, 1.5) * 0.3),
-            filter: `${blur ? `blur(${blur.toFixed(1)}px)` : ''}${on ? '' : ' grayscale(1)'}` || undefined,
+            transform: `translate3d(${x}px,0,${z}px) rotateY(${rotY}deg) scale(${scale})`,
+            opacity: (on ? 1 : 0.14) * Math.max(depthOpacity, 0),
+            filter: `${blur > 0.2 ? `blur(${blur.toFixed(1)}px)` : ''}${on ? '' : ' grayscale(1)'}`.trim() || undefined,
             transition: 'opacity 300ms',
           }}
         >
@@ -285,7 +288,7 @@ export default function MarketplaceFrame({ onOpen, onRent }) {
         className="preserve-3d absolute inset-0"
         style={{
           transform: `translate3d(0,${dk * rowPx}px,${-Math.abs(dk) * 90}px) rotateX(${dk * 12}deg)`,
-          opacity: 1 - Math.min(Math.abs(dk), 1.4) * 0.55,
+          opacity: 1 - Math.min(Math.abs(dk), 1.4) * 0.45,
         }}
         aria-hidden={Math.round(dk) !== 0}
       >
@@ -304,7 +307,7 @@ export default function MarketplaceFrame({ onOpen, onRent }) {
 
       <div className="flex shrink-0 items-baseline justify-between px-5 pb-1 pt-3">
         <h2 className="eyebrow">{domain.label}</h2>
-        <span className="text-caption text-muted">Drag to browse · swipe for more</span>
+        <span className="text-caption text-muted">Drag to browse · tap a card to rent</span>
       </div>
 
       <div
@@ -332,37 +335,6 @@ export default function MarketplaceFrame({ onOpen, onRent }) {
         )}
       </div>
 
-      {/* Selected skill */}
-      <div className="shrink-0 border-t border-line px-5 pb-4 pt-3">
-        <div className="flex items-center justify-between gap-3">
-          <p className="eyebrow">Selected skill</p>
-          <TypeBadge label={MODEL_TYPES[focused.type].label} className="bg-surface" />
-        </div>
-        <p className="mt-2 truncate text-title text-ink">{skillName(focused)}</p>
-        <p className="mt-1 flex items-center gap-1 text-[12px] text-muted">
-          <Icon name="star" fill size={14} className="text-accent" label="Rating" />
-          <span className="text-ink">{focused.rating}</span> ({focused.rentals}) ·{' '}
-          <span className="tabular-nums">{inr(focused.hourly)}</span>/hr · <span className="tabular-nums">{Math.round(focused.match)}%</span> fit
-        </p>
-        <div className="mt-3 flex gap-2">
-          <button onClick={() => onOpen(focused)} disabled={!focusedOn} className="btn-secondary px-4">
-            Details
-          </button>
-          {focused.waitMins ? (
-            <button
-              onClick={() => onOpen(focused)}
-              disabled={!focusedOn}
-              className="btn flex-1 border border-accent/50 text-accent hover:bg-accent/10"
-            >
-              <Icon name="schedule" size={18} /> {formatWait(focused.waitMins)}
-            </button>
-          ) : (
-            <button onClick={() => onRent('1h', focused)} disabled={!focusedOn} className="btn-primary flex-1">
-              Rent &amp; start skill
-            </button>
-          )}
-        </div>
-      </div>
     </div>
   );
 }
