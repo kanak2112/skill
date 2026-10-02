@@ -2,8 +2,10 @@
 
 Interactive design-fiction prototype for a BCI skill-rental platform. React (Vite) and Tailwind CSS,
 set entirely in Google Sans Flex with Material Symbols Outlined icons (weight 300). Low-chroma dark
-palette: slate surfaces, cool grey text, warm brass (#D4A359) for active state, soft coral (#E06D53)
-for warnings and stop. All people and licence numbers are fictional.
+palette with strict colour roles: brass (#E2B168) for primary actions and selection, teal (#5BBFBA)
+for connection status, amber (#F2A65A) for warnings, coral (#E06D53) for disconnect and loss.
+Radii: 16px containers, 8px cards / inputs / buttons, full pills for badges. All people and licence
+numbers are fictional.
 
 ```bash
 npm install
@@ -19,9 +21,10 @@ npm run build
   domains — Culinary, Craft, Physical, Cognitive (infinite). Trackpad/wheel and arrow keys also work.
 - Search bar ("Search skills, tasks, or experts...") with simulated voice input and suggestion tags;
   results dim non-matches and bring the nearest match forward, across skill areas.
-- Filter tabs (All / Human experts / Combined / AI generated) work the same way.
+- Filter tabs (All / Human experts / Composite / Synthetic) work the same way.
 - Depth: centre card 100%; neighbours 85% scale, 18° Y rotation, 65% opacity; cards further round
-  and other skill areas blur to 6px. Neighbours keep playing at a slower speed.
+  and other skill areas go out of focus: footage blurs (drawn in canvas) and labels fade out.
+  Neighbours keep playing at a slower speed.
 - Tile treatments: **Personal** — cyan badge, gold verified crest, expert signature watermark.
   **Composite** — stacked layers + node-network overlay. **Synthetic** — rotating wireframe shimmer
   border, wireframe grid, "No single human owner" tag.

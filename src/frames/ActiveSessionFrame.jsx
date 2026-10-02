@@ -37,15 +37,15 @@ function Sparkline({ series, min, max, tone }) {
 }
 
 const STATE = {
-  active: { title: 'Skill active', icon: 'sensors', tone: 'text-accent' },
-  warning: { title: 'Adjusting', icon: 'vital_signs', tone: 'text-alert' },
+  active: { title: 'Skill active', icon: 'sensors', tone: 'text-teal' },
+  warning: { title: 'Adjusting', icon: 'vital_signs', tone: 'text-amber' },
   disconnected: { title: 'Disconnected', icon: 'power_settings_new', tone: 'text-muted' },
   off: { title: 'Session finished', icon: 'check_circle', tone: 'text-muted' },
 };
 
 function StatusBanner({ led, model }) {
   const state = STATE[led];
-  const source = model.expert ?? (model.trainedOn ? `Learned from ${model.trainedOn}` : 'AI generated');
+  const source = model.expert ?? (model.trainedOn ? `Synthesized from ${model.trainedOn}` : 'Synthetic model');
   return (
     <div role="status">
       <p className={`eyebrow flex items-center gap-1.5 ${state.tone}`}>
@@ -62,21 +62,21 @@ function AnomalyAlert({ phase, progress }) {
   if (phase === 'none') return null;
   if (phase === 'resolved') {
     return (
-      <div className="flex items-center gap-2.5 rounded-xl border border-line bg-surface px-4 py-3" role="status">
-        <Icon name="check_circle" size={18} className="text-accent" />
+      <div className="flex items-center gap-2.5 border-y border-line py-3" role="status">
+        <Icon name="check_circle" size={18} className="text-teal" />
         <p className="text-[13px] text-ink">Signals are back to normal.</p>
       </div>
     );
   }
   return (
-    <div className="rounded-xl border border-alert/40 bg-alert/[0.06] p-4" role="alert">
+    <div className="rounded-xl border border-amber/40 bg-amber/[0.06] p-4" role="alert">
       <div className="flex gap-2.5">
-        <Icon name="vital_signs" size={18} className="text-alert" />
+        <Icon name="vital_signs" size={18} className="text-amber" />
         <div className="min-w-0 flex-1">
           <p className="text-title text-ink">Unusual muscle signals. Adjusting automatically.</p>
           <p className="mt-0.5 text-caption text-muted">You may feel a slight twitch. No need to stop.</p>
           <div className="mt-3 h-0.5 overflow-hidden rounded-full bg-line">
-            <div className="h-full rounded-full bg-alert transition-[width] duration-100" style={{ width: `${progress * 100}%` }} />
+            <div className="h-full rounded-full bg-amber transition-[width] duration-100" style={{ width: `${progress * 100}%` }} />
           </div>
         </div>
       </div>
@@ -98,7 +98,7 @@ function Telemetry({ session, anomaly }) {
   ];
 
   return (
-    <section className="card p-5">
+    <section className="border-t border-line pt-5">
       <p className="eyebrow">Time left</p>
       <p
         className={`metric mt-2 text-[56px] font-light ${live ? 'text-ink' : 'text-muted'}`}
@@ -115,7 +115,7 @@ function Telemetry({ session, anomaly }) {
         aria-label="Time left"
       >
         <div
-          className={`h-full rounded-full transition-[width] duration-1000 ease-linear ${live ? 'bg-accent' : 'bg-muted'}`}
+          className={`h-full rounded-full transition-[width] duration-1000 ease-linear ${live ? 'bg-teal' : 'bg-muted'}`}
           style={{ width: `${pct}%` }}
         />
       </div>
@@ -124,8 +124,8 @@ function Telemetry({ session, anomaly }) {
           <div key={r.label} className="flex items-center justify-between gap-3 py-3 last:pb-0">
             <dt className="text-[14px] text-ink">{r.label}</dt>
             <dd className="flex items-center gap-3">
-              {live && <Sparkline series={r.reading.series} min={r.min} max={r.max} tone={r.warn ? 'text-alert' : 'text-muted'} />}
-              <span className={`w-14 text-right text-[15px] ${r.warn ? 'text-alert' : 'text-ink'}`}>
+              {live && <Sparkline series={r.reading.series} min={r.min} max={r.max} tone={r.warn ? 'text-amber' : 'text-muted'} />}
+              <span className={`metric w-16 text-right text-[18px] ${r.warn ? 'text-amber' : 'text-ink'}`}>
                 {r.reading.value == null ? 'Off' : `${Math.round(r.reading.value)} ${r.unit}`}
               </span>
             </dd>
@@ -147,7 +147,7 @@ export default function ActiveSessionFrame({ session, anomaly, onTerminate, onVi
       <AnomalyAlert phase={anomaly.phase} progress={anomaly.progress} />
       <Telemetry session={session} anomaly={anomaly} />
 
-      <section className="card px-5 pb-5 pt-4">
+      <section className="border-t border-line pt-5">
         <p className="eyebrow">Your patch</p>
         <div className="mt-4 flex justify-center">
           <Wearable led={led} onKill={onTerminate} disabled={!live} />

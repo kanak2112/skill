@@ -4,12 +4,14 @@
 
 /* CSS-variable mirror of src/theme/tokens.js */
 :root {
-  --canvas: #0b0f17;
-  --surface: #161c26;
+  --canvas: #090d14;
+  --surface: #141a24;
   --line: #222a38;
   --ink: #f1f5f9;
-  --muted: #8e9bae;
-  --accent: #d4a359;
+  --muted: #94a3b8;
+  --accent: #e2b168;
+  --teal: #5bbfba;
+  --amber: #f2a65a;
   --alert: #e06d53;
   color-scheme: dark;
 }
@@ -34,27 +36,27 @@
 }
 
 @layer components {
-  .card {
-    @apply rounded-xl border border-line bg-surface;
-  }
-  /* Uppercase section title */
+  /* Sentence-case section title */
   .eyebrow {
-    @apply text-section uppercase text-muted;
+    @apply text-section text-muted;
   }
-  /* Primary numeric metric: condensed width */
+  /* Precision numerics: tabular figures, condensed width */
   .metric {
-    @apply text-metric tabular-nums;
-    font-stretch: 82%;
+    @apply text-metric;
+    font-feature-settings: 'tnum' 1;
+    font-variant-numeric: tabular-nums;
+    font-variation-settings: 'wdth' 75;
+    font-stretch: 75%;
   }
-  /* Thin monochrome tag */
+  /* Full-pill badge */
   .tag {
-    @apply inline-flex items-center gap-1 rounded-lg px-2 py-1 text-tag uppercase;
+    @apply inline-flex h-[22px] items-center gap-1 rounded-full px-2.5 text-tag;
   }
   .btn {
     @apply inline-flex h-11 items-center justify-center gap-2 rounded-lg px-4 text-[14px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40;
   }
   .btn-primary {
-    @apply btn bg-accent text-[#0F172A] hover:bg-[#DEB273] active:bg-[#C29147];
+    @apply btn bg-accent text-[#0F172A] hover:bg-[#EBC283] active:bg-[#D19E55];
   }
   .btn-secondary {
     @apply btn border border-line bg-transparent text-ink hover:bg-surface;
@@ -92,6 +94,10 @@
   user-select: none;
   -webkit-font-smoothing: antialiased;
   font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 20;
+}
+/* Until the symbol font has loaded, keep ligature names invisible */
+html:not(.icons-ready) .icon {
+  color: transparent !important;
 }
 .icon-fill {
   font-variation-settings: 'FILL' 1, 'wght' 300, 'GRAD' 0, 'opsz' 20;

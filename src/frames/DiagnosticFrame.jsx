@@ -4,8 +4,8 @@ import Icon from '../components/Icon.jsx';
 const SESSION_ID = '88492';
 
 const AFTER_EFFECTS = [
-  { key: 'tremor', icon: 'vibration', title: 'Hand tremor (temporary)', note: 'Mild shaking when your hands are at rest', value: '14', unit: 'h' },
-  { key: 'speech', icon: 'record_voice_over', title: 'Speech habits (temporary)', note: "The expert's rhythm of speaking may linger", value: '+18', unit: 'h' },
+  { key: 'tremor', icon: 'back_hand', title: 'Hand tremor (temporary)', note: 'Mild shaking when your hands are at rest', value: '14', unit: 'h' },
+  { key: 'speech', icon: 'graphic_eq', title: 'Speech habits (temporary)', note: "The expert's rhythm of speaking may linger", value: '+18', unit: 'h' },
 ];
 
 function exportData(skill) {
@@ -44,14 +44,11 @@ function Track({ pct, tone = 'bg-accent' }) {
   );
 }
 
-function Metric({ label, hint, value, pct, tone }) {
+function Metric({ label, value, pct, tone }) {
   return (
     <div>
-      <div className="flex items-end justify-between gap-3">
-        <div>
-          <p className="text-[14px] text-ink">{label}</p>
-          <p className="text-caption text-muted">{hint}</p>
-        </div>
+      <div className="flex items-baseline justify-between gap-3">
+        <p className="text-[14px] text-ink">{label}</p>
         <span className="metric text-ink">{value}</span>
       </div>
       <Track pct={pct} tone={tone} />
@@ -95,18 +92,18 @@ export default function DiagnosticFrame({ session, onDone }) {
   };
 
   return (
-    <div className="space-y-6 p-5">
-      <section className="card space-y-6 p-5">
+    <div className="space-y-7 p-5">
+      <section className="space-y-6">
         <p className="eyebrow">
           How it went · <span className="tabular-nums">1</span>h <span className="tabular-nums">00</span>m
         </p>
-        <Metric label="How well you did" hint="With the skill running" value="99.2%" pct={99.2} tone="bg-accent" />
-        <Metric label="What you kept" hint="Learned for yourself" value="2.1%" pct={2.1} tone="bg-muted" />
+        <Metric label="Active performance" value="99.2%" pct={99.2} tone="bg-ink" />
+        <Metric label="Skill retention" value="2.1%" pct={2.1} tone="bg-muted" />
       </section>
 
-      <section>
-        <p className="eyebrow mb-2">After-effects</p>
-        <ul className="card divide-y divide-line px-5">
+      <section className="border-t border-line pt-5">
+        <p className="eyebrow">After-effects</p>
+        <ul className="mt-1 divide-y divide-line">
           {AFTER_EFFECTS.map((t) => (
             <li key={t.key} className="flex items-center gap-3 py-4">
               <Icon name={t.icon} size={16} className="text-muted" />
@@ -123,24 +120,22 @@ export default function DiagnosticFrame({ session, onDone }) {
         </ul>
       </section>
 
-      <section className="card p-5">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-title text-ink">Natural skill loss</p>
-            <p className="mt-1 text-caption leading-relaxed text-muted">
-              Relying on rented skills makes you a little worse at doing it on your own, for a while.
-            </p>
-          </div>
+      <section className="border-t border-line pt-5">
+        <div className="flex items-baseline justify-between gap-3">
+          <p className="text-title text-ink">Natural skill loss</p>
           <span className="metric shrink-0 text-ink">
             <span className="text-alert">−</span>14%
           </span>
         </div>
+        <p className="mt-1 max-w-[30ch] text-caption leading-relaxed text-muted">
+          Relying on rented skills makes you a little worse at doing it on your own, for a while.
+        </p>
         <LossTrack />
       </section>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-3 border-t border-line pt-5">
         <button onClick={handleExport} className="btn-secondary h-12">
-          <Icon name={exported ? 'check' : 'download'} size={18} className={exported ? 'text-accent' : ''} />
+          <Icon name={exported ? 'check' : 'download'} size={18} className={exported ? 'text-teal' : ''} />
           {exported ? 'Exported' : 'Export data'}
         </button>
         <button onClick={onDone} className="btn-primary h-12">

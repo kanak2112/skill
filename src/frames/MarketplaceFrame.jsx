@@ -75,7 +75,7 @@ function Suggestions({ query, onQuery }) {
             key={s}
             onClick={() => onQuery(on ? '' : s)}
             aria-pressed={on}
-            className={`h-7 shrink-0 rounded-lg px-3 text-[12px] transition-colors ${
+            className={`h-7 shrink-0 rounded-full px-3 text-[12px] transition-colors ${
               on ? 'bg-accent/15 text-accent' : 'bg-surface text-muted hover:text-ink'
             }`}
           >
@@ -258,7 +258,8 @@ export default function MarketplaceFrame({ onOpen }) {
       const rotY = -Math.sign(rel) * (near * 18 + far * 10); // 0° → 18° facing the viewer
       const depthOpacity = 1 - near * 0.35 - far * 0.35; // 1.0 → 0.65 → fading
       const rowOff = Math.min(Math.abs(dk), 1);
-      const blur = Math.min(6, far * 6 + rowOff * 6); // background cards and other rows: up to 6px
+      // Out-of-focus cards (further round the wall, or in other skill areas) lose focus progressively.
+      const focus = Math.round((1 - Math.min(1, far + rowOff)) * 10) / 10;
       const m = modelAt(k, i);
       const on = matches(m);
       tiles.push(
@@ -274,11 +275,11 @@ export default function MarketplaceFrame({ onOpen }) {
             marginTop: -tileH / 2,
             transform: `translate3d(${x}px,0,${z}px) rotateY(${rotY}deg) scale(${scale})`,
             opacity: (on ? 1 : 0.14) * Math.max(depthOpacity, 0),
-            filter: `${blur > 0.2 ? `blur(${blur.toFixed(1)}px)` : ''}${on ? '' : ' grayscale(1)'}`.trim() || undefined,
+            filter: on ? undefined : 'grayscale(1)',
             transition: 'opacity 300ms',
           }}
         >
-          <VaultTile model={m} offset={i * 0.37 + mod(k, DOMAINS.length) * 1.3} speed={side < 0.4 && Math.abs(dk) < 0.5 ? 1 : 0.4} />
+          <VaultTile model={m} offset={i * 0.37 + mod(k, DOMAINS.length) * 1.3} speed={side < 0.4 && Math.abs(dk) < 0.5 ? 1 : 0.4} focus={focus} />
         </div>,
       );
     }
@@ -287,7 +288,9 @@ export default function MarketplaceFrame({ onOpen }) {
         key={k}
         className="preserve-3d absolute inset-0"
         style={{
-          transform: `translate3d(0,${dk * rowPx}px,${-Math.abs(dk) * 90}px) rotateX(${dk * 12}deg)`,
+          // Rows recede by scale only. translateZ or rotateX on a full-width row plane makes it
+          // intersect the focused row, and Chrome then drops the row from the composite.
+          transform: `translate3d(0,${dk * rowPx}px,0) scale(${1 - Math.min(Math.abs(dk), 1.5) * 0.08})`,
           opacity: 1 - Math.min(Math.abs(dk), 1.4) * 0.45,
         }}
         aria-hidden={Math.round(dk) !== 0}

@@ -1,16 +1,12 @@
 import Icon from './Icon.jsx';
 
-/** Monochrome provenance tag: HUMAN EXPERT / COMBINED / AI GENERATED. */
+/** Provenance badge: Human expert / Composite / Synthetic model. Full pill, sentence case. */
 export function TypeBadge({ label, className = '' }) {
-  return <span className={`tag bg-canvas/70 text-ink ring-1 ring-ink/15 backdrop-blur-sm ${className}`}>{label}</span>;
+  return <span className={`tag bg-canvas/75 text-ink ring-1 ring-ink/15 backdrop-blur-sm ${className}`}>{label}</span>;
 }
 
 export function VerifiedCrest({ size = 16, className = '' }) {
-  return <Icon name="verified" fill size={size} className={`text-accent ${className}`} label="Verified expert" />;
-}
-
-export function NoOwnerTag() {
-  return <span className="tag bg-canvas/70 text-muted ring-1 ring-ink/10 backdrop-blur-sm">No human owner</span>;
+  return <Icon name="verified" size={size} className={`text-accent ${className}`} label="Verified expert" />;
 }
 
 /** Expert signature watermark for human-expert models. */
@@ -102,7 +98,7 @@ export function ShimmerBorder({ children, className = '', radius = 'rounded-xl' 
         className="absolute -inset-1/2 animate-shimmer"
         style={{
           background:
-            'conic-gradient(from 0deg, #222A38, rgba(241,245,249,0.55) 8%, rgba(212,163,89,0.35) 13%, #222A38 24%, #222A38 58%, rgba(241,245,249,0.35) 68%, #222A38 78%)',
+            'conic-gradient(from 0deg, #222A38, rgba(241,245,249,0.5) 8%, rgba(226,177,104,0.3) 13%, #222A38 24%, #222A38 58%, rgba(241,245,249,0.3) 68%, #222A38 78%)',
         }}
         aria-hidden="true"
       />

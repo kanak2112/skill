@@ -6,21 +6,21 @@ const RELEASE_MS = 1100; // ring drains once triggered
 const R = 92;
 const C = 2 * Math.PI * R;
 
-const BRASS = [212, 163, 89];
+const TEAL = [91, 191, 186];
 const CORAL = [224, 109, 83];
-const mix = (t) => `rgb(${BRASS.map((b, i) => Math.round(b + (CORAL[i] - b) * t)).join(',')})`;
+const mix = (t) => `rgb(${TEAL.map((b, i) => Math.round(b + (CORAL[i] - b) * t)).join(',')})`;
 
 export const LED = {
-  active: { color: '#D4A359', label: 'Active', text: 'text-accent' },
-  warning: { color: '#E06D53', label: 'Warning', text: 'text-alert' },
-  disconnected: { color: '#8E9BAE', label: 'Disconnected', text: 'text-muted' },
+  active: { color: '#5BBFBA', label: 'Active', text: 'text-teal' },
+  warning: { color: '#F2A65A', label: 'Warning', text: 'text-amber' },
+  disconnected: { color: '#94A3B8', label: 'Disconnected', text: 'text-muted' },
   off: { color: '#222A38', label: 'Idle', text: 'text-muted' },
 };
 
 /**
  * The patch: a thin status ring around a touch stop control, the only way to
  * end a session from this screen. Hold for 3 s (3-2-1); the ring fills and
- * shifts from brass to coral. Letting go early cancels. Once complete the ring
+ * shifts from teal (connected) to coral (disconnect). Letting go early cancels. Once complete the ring
  * drains before the skill is released, so the stop reads as deliberate.
  */
 export default function Wearable({ led, onKill, disabled }) {
@@ -127,7 +127,7 @@ export default function Wearable({ led, onKill, disabled }) {
         }}
         onKeyUp={cancel}
         onContextMenu={(e) => e.preventDefault()}
-        className="absolute left-1/2 top-1/2 flex h-[150px] w-[150px] -translate-x-1/2 -translate-y-1/2 touch-none select-none flex-col items-center justify-center gap-1 rounded-full border border-line bg-surface text-muted transition-colors enabled:hover:text-ink disabled:cursor-not-allowed"
+        className="absolute left-1/2 top-1/2 flex h-[150px] w-[150px] -translate-x-1/2 -translate-y-1/2 touch-none select-none flex-col items-center justify-center gap-1 rounded-full border border-line bg-canvas text-muted transition-colors enabled:hover:text-ink disabled:cursor-not-allowed"
         aria-label="Stop: press and hold for 3 seconds to disconnect"
       >
         {releasing > 0 ? (

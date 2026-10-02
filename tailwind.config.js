@@ -1,4 +1,4 @@
-import { colors, fonts, type } from './src/theme/tokens.js';
+import { colors, fonts, radii, type } from './src/theme/tokens.js';
 
 /** @type {import('tailwindcss').Config} */
 export default {
@@ -9,11 +9,11 @@ export default {
       fontFamily: { sans: fonts.sans, mono: fonts.sans },
       fontSize: type,
       borderRadius: {
-        DEFAULT: '8px',
-        md: '8px',
-        lg: '8px',
-        xl: '12px',
-        '2xl': '16px',
+        DEFAULT: radii.control,
+        md: radii.control,
+        lg: radii.control,
+        xl: radii.control,
+        '2xl': radii.container,
       },
       keyframes: {
         breathe: {
@@ -28,8 +28,8 @@ export default {
           '100%': { transform: 'scale(1.08) translate(-2%, -1.5%)' },
         },
         'queue-pulse': {
-          '0%, 100%': { borderColor: 'rgba(212,163,89,0.85)' },
-          '50%': { borderColor: 'rgba(212,163,89,0.3)' },
+          '0%, 100%': { borderColor: 'rgba(226,177,104,0.9)' },
+          '50%': { borderColor: 'rgba(226,177,104,0.3)' },
         },
         'node-pulse': {
           '0%, 100%': { opacity: '0.8' },

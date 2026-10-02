@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Icon from './Icon.jsx';
 import Footage from './Footage.jsx';
-import { NodeNetwork, NoOwnerTag, ShimmerBorder, SignatureWatermark, TypeBadge, VerifiedCrest, Wireframe } from './ModelVisuals.jsx';
+import { NodeNetwork, ShimmerBorder, SignatureWatermark, TypeBadge, VerifiedCrest, Wireframe } from './ModelVisuals.jsx';
 import { MODEL_TYPES, formatWait, inr } from '../data/catalog.js';
 import { DURATIONS } from '../hooks/useSessionTimer.js';
 
@@ -122,13 +122,13 @@ function Fold({ title, children }) {
 function MoreDetails({ model }) {
   const isHuman = model.type === 'personal';
   return (
-    <div className="card divide-y divide-line px-4">
+    <div className="divide-y divide-line border-y border-line">
       <Fold title={isHuman ? 'About the expert' : 'Where this skill comes from'}>
         <p className="text-[14px] leading-relaxed text-ink/80">{model.bio}</p>
         <div className="mt-2 divide-y divide-line">
           {isHuman && <Row label="Verification">{model.creatorLevel}</Row>}
-          {model.type === 'composite' && <Row label="Learned from">{model.trainedOn}</Row>}
-          {model.type === 'synthetic' && <Row label="Owner">No human owner</Row>}
+          {model.type === 'composite' && <Row label="Synthesized from">{model.trainedOn}</Row>}
+          {model.type === 'synthetic' && <Row label="Owner">Licensed by the platform</Row>}
           <Row label="Licence">
             CDSCO Class-III, active
             <span className="block text-[12px] text-muted">#{model.licence}</span>
@@ -255,7 +255,7 @@ export default function SkillSheet({ model, onClose, onRent }) {
           </button>
         </div>
 
-        <div className="no-scrollbar flex-1 space-y-6 overflow-y-auto px-5 pb-6">
+        <div className="no-scrollbar flex-1 space-y-7 overflow-y-auto px-5 pb-12">
           <Preview model={model} />
 
           {/* Header */}
@@ -268,20 +268,19 @@ export default function SkillSheet({ model, onClose, onRent }) {
               ) : (
                 <TypeBadge label={type.label} className="bg-surface" />
               )}
-              {model.type === 'synthetic' && <NoOwnerTag />}
             </div>
-            <h2 id="sheet-title" className="mt-3 text-[22px] font-medium leading-tight tracking-[-0.02em] text-ink">
+            <h2 id="sheet-title" className="mt-3 text-display text-ink">
               {model.title.replace(/ v\d.*$/, '')}
             </h2>
             <p className="mt-1.5 text-[14px] text-muted">
-              {model.type === 'personal' ? `By ${model.expert}` : model.type === 'composite' ? `Learned from ${model.trainedOn}` : type.copy}
+              {model.type === 'personal' ? `By ${model.expert}` : model.type === 'composite' ? `Synthesized from ${model.trainedOn}` : type.copy}
             </p>
           </div>
 
           {/* Three key numbers */}
           <div className="grid grid-cols-3 gap-4 border-y border-line py-4">
             <Spec value={model.rating} label={`Rating (${model.rentals})`}>
-              <Icon name="star" fill size={18} className="text-accent" label="stars" />
+              <Icon name="star" size={14} className="-translate-y-1 text-muted" label="stars" />
             </Spec>
             <Spec value={<span className="tabular-nums">{Math.round(model.match)}%</span>} label="Fit for you" />
             <Spec value={<span className="tabular-nums">{inr(model.hourly)}</span>} label="Per hour" />
@@ -309,7 +308,9 @@ export default function SkillSheet({ model, onClose, onRent }) {
         </div>
 
         {/* Action */}
-        <div className="shrink-0 space-y-3 border-t border-line bg-canvas px-5 pb-5 pt-3">
+        <div className="relative shrink-0 space-y-3 border-t border-line bg-canvas px-5 pb-5 pt-3">
+          {/* Fade so scrolled content visibly continues under the action bar instead of looking cut off */}
+          <div className="pointer-events-none absolute inset-x-0 -top-8 h-8 bg-gradient-to-t from-canvas to-transparent" aria-hidden="true" />
           {queue === 'queued' ? (
             <div className="animate-queue-pulse rounded-xl border bg-accent/10 p-3.5" role="status" aria-live="polite">
               <div className="flex items-center gap-3">

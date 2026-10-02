@@ -36,10 +36,8 @@ export default function App() {
 
   return (
     <div className="flex min-h-[100dvh] flex-col items-center gap-3 p-3 sm:justify-center sm:p-6">
-      <FrameTabs active={frame} onChange={switchFrame} />
-
       {/* Device */}
-      <div className="relative flex h-[calc(100dvh-7.5rem)] min-h-[600px] w-full max-w-[420px] flex-col overflow-hidden rounded-2xl border border-line bg-canvas sm:h-[860px] sm:max-h-[calc(100dvh-9rem)]">
+      <div className="relative flex h-[calc(100dvh-4.5rem)] min-h-[600px] w-full max-w-[420px] flex-col overflow-hidden rounded-2xl border border-line bg-canvas sm:h-[860px] sm:max-h-[calc(100dvh-6rem)]">
         <Header sessionStatus={session.status} />
 
         <main
@@ -63,18 +61,17 @@ export default function App() {
         )}
       </div>
 
-      {/* Prototype-only controls */}
-      <div className="flex h-8 items-center gap-3 text-[12px] text-muted">
-        {frame === 'session' && session.status === 'active' ? (
+      {/* Prototype-only controls, kept outside the device */}
+      <div className="flex flex-wrap items-center justify-center gap-2">
+        <FrameTabs active={frame} onChange={switchFrame} />
+        {frame === 'session' && session.status === 'active' && (
           <button
             onClick={anomaly.trigger}
-            className="flex items-center gap-1.5 rounded-lg border border-line px-2.5 py-1 hover:text-ink"
+            className="flex h-8 items-center gap-1.5 rounded-full border border-line px-3 text-[12px] text-muted hover:text-ink"
           >
-            <Icon name="vital_signs" size={16} /> Simulate anomaly
+            <Icon name="vital_signs" size={14} /> Simulate anomaly
           </button>
-        ) : frame === 'market' ? (
-          <span>Drag sideways to browse · swipe up or down to change area · tap a card to rent</span>
-        ) : null}
+        )}
       </div>
     </div>
   );
