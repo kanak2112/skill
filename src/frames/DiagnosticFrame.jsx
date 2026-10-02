@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Check } from 'lucide-react';
 
-const SESSION_ID = 'SYN-88492';
+const SESSION_ID = '88492';
 
 const METRICS = [
   { key: 'execution', value: '99.2%', label: 'Task Execution', tone: 'text-ink' },
