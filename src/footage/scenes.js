@@ -645,7 +645,7 @@ function numbers(ctx, w, h, t) {
   ctx.fillStyle = '#f8fafc';
   ctx.fillText(q.slice(0, Math.ceil(Math.min(1, p / 0.35) * q.length)), w / 2, h * 0.49);
   if (p > 0.5) {
-    ctx.fillStyle = '#38bdf8';
+    ctx.fillStyle = '#D4A359';
     ctx.font = '600 20px "Google Sans Flex", sans-serif';
     ctx.fillText(`= ${a}`, w / 2, h * 0.59);
   }
@@ -700,7 +700,7 @@ function speech(ctx, w, h, t) {
     const amp = 0.15 + 0.85 * Math.abs(Math.sin(t * 6 + i * 0.6) * Math.sin(t * 1.3 + i * 0.2));
     const bh = amp * h * 0.26;
     const mid = Math.abs(i - bars / 2) < 4;
-    ctx.fillStyle = mid ? '#38bdf8' : 'rgba(148,163,184,0.7)';
+    ctx.fillStyle = mid ? '#D4A359' : 'rgba(142,155,174,0.7)';
     ctx.beginPath();
     ctx.roundRect(w * 0.1 + i * bw + 1, h * 0.42 - bh / 2, bw - 2, bh, 2);
     ctx.fill();
@@ -719,9 +719,9 @@ export const SCENES = { knife, flame, wok, lathe, wheel, solder, suture, stride,
 export function grade(ctx, w, h) {
   const g = ctx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.3, w / 2, h / 2, Math.max(w, h) * 0.75);
   g.addColorStop(0, 'rgba(0,0,0,0)');
-  g.addColorStop(1, 'rgba(0,0,0,0.5)');
+  g.addColorStop(1, 'rgba(0,0,0,0.55)');
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, w, h);
-  ctx.fillStyle = 'rgba(15,23,42,0.12)';
+  ctx.fillStyle = 'rgba(11,15,23,0.16)';
   ctx.fillRect(0, 0, w, h);
 }

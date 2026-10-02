@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Activity } from 'lucide-react';
+import Icon from './components/Icon.jsx';
 import Header from './components/Header.jsx';
 import FrameTabs from './components/FrameTabs.jsx';
 import SkillSheet from './components/SkillSheet.jsx';
@@ -68,9 +68,9 @@ export default function App() {
         {frame === 'session' && session.status === 'active' ? (
           <button
             onClick={anomaly.trigger}
-            className="flex items-center gap-1.5 rounded-md border border-line px-2.5 py-1 hover:text-ink"
+            className="flex items-center gap-1.5 rounded-lg border border-line px-2.5 py-1 hover:text-ink"
           >
-            <Activity className="h-3.5 w-3.5" /> Simulate anomaly
+            <Icon name="vital_signs" size={16} /> Simulate anomaly
           </button>
         ) : frame === 'market' ? (
           <span>Drag sideways to browse · swipe up or down to change area · tap a card for details</span>

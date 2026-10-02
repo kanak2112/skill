@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ChevronDown, Clock, Info, Pause, Play, RotateCcw, Star, VolumeX, X } from 'lucide-react';
+import Icon from './Icon.jsx';
 import Footage from './Footage.jsx';
 import { NodeNetwork, NoOwnerTag, ShimmerBorder, SignatureWatermark, TypeBadge, VerifiedCrest, Wireframe } from './ModelVisuals.jsx';
 import { MODEL_TYPES, formatWait, inr } from '../data/catalog.js';
@@ -28,7 +28,7 @@ function Preview({ model }) {
           className="flex h-8 w-8 items-center justify-center rounded-full bg-ink/15 text-ink backdrop-blur-sm hover:bg-ink/25"
           aria-label={paused ? 'Play preview' : 'Pause preview'}
         >
-          {paused ? <Play className="h-3.5 w-3.5 fill-current" /> : <Pause className="h-3.5 w-3.5 fill-current" />}
+          <Icon name={paused ? 'play_arrow' : 'pause'} size={18} />
         </button>
         <button
           onClick={() => {
@@ -38,24 +38,24 @@ function Preview({ model }) {
           className="flex h-8 w-8 items-center justify-center rounded-full bg-ink/15 text-ink backdrop-blur-sm hover:bg-ink/25"
           aria-label="Restart preview"
         >
-          <RotateCcw className="h-3.5 w-3.5" />
+          <Icon name="replay" size={18} />
         </button>
         <span className="ml-auto flex items-center gap-1.5 rounded-full bg-canvas/60 px-2.5 py-1 text-[11px] text-muted backdrop-blur-sm">
-          <VolumeX className="h-3 w-3" /> Muted preview
+          <Icon name="volume_off" size={14} /> Muted preview
         </span>
       </div>
     </div>
   );
 
   if (model.type === 'synthetic') return <ShimmerBorder>{frame}</ShimmerBorder>;
-  return <div className={`rounded-xl border ${model.type === 'personal' ? 'border-cyan/40' : 'border-accent/40'}`}>{frame}</div>;
+  return <div className={`rounded-xl border ${model.type === 'personal' ? 'border-accent/30' : 'border-line'}`}>{frame}</div>;
 }
 
 function Spec({ value, label, children }) {
   return (
     <div className="min-w-0">
-      <p className="flex items-center gap-1 text-[20px] font-semibold leading-none text-ink">{value}{children}</p>
-      <p className="mt-2 text-[12px] text-muted">{label}</p>
+      <p className="metric flex items-center gap-1 text-ink">{value}{children}</p>
+      <p className="mt-2 text-caption text-muted">{label}</p>
     </div>
   );
 }
@@ -112,7 +112,7 @@ function Fold({ title, children }) {
     <div>
       <button onClick={() => setOpen((o) => !o)} aria-expanded={open} className="flex w-full items-center justify-between py-3.5 text-left">
         <span className="text-[14px] text-ink">{title}</span>
-        <ChevronDown className={`h-4 w-4 text-muted transition-transform ${open ? 'rotate-180' : ''}`} />
+        <Icon name="expand_more" size={20} className={`text-muted transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && <div className="pb-4">{children}</div>}
     </div>
@@ -251,7 +251,7 @@ export default function SkillSheet({ model, onClose, onRent }) {
             className="flex h-8 w-8 items-center justify-center rounded-full bg-surface text-muted hover:text-ink"
             aria-label="Close"
           >
-            <X className="h-4 w-4" />
+            <Icon name="close" size={18} />
           </button>
         </div>
 
@@ -262,15 +262,15 @@ export default function SkillSheet({ model, onClose, onRent }) {
           <div>
             <div className="flex flex-wrap items-center gap-2">
               {model.type === 'personal' ? (
-                <span className="inline-flex items-center gap-1.5 rounded-md bg-gold/10 px-2 py-1 text-[12px] font-medium text-gold">
-                  <VerifiedCrest className="h-3.5 w-3.5" /> Verified expert
+                <span className="tag bg-accent/10 text-accent">
+                  <VerifiedCrest size={14} /> Verified expert
                 </span>
               ) : (
-                <TypeBadge type={model.type} label={type.label} size="md" />
+                <TypeBadge label={type.label} className="bg-surface" />
               )}
               {model.type === 'synthetic' && <NoOwnerTag />}
             </div>
-            <h2 id="sheet-title" className="mt-3 text-[22px] font-semibold leading-tight tracking-tight text-ink">
+            <h2 id="sheet-title" className="mt-3 text-[22px] font-medium leading-tight tracking-[-0.02em] text-ink">
               {model.title.replace(/ v\d.*$/, '')}
             </h2>
             <p className="mt-1.5 text-[14px] text-muted">
@@ -281,7 +281,7 @@ export default function SkillSheet({ model, onClose, onRent }) {
           {/* Three key numbers */}
           <div className="grid grid-cols-3 gap-4 border-y border-line py-4">
             <Spec value={model.rating} label={`Rating (${model.rentals})`}>
-              <Star className="h-4 w-4 fill-warning text-warning" strokeWidth={0} aria-label="stars" />
+              <Icon name="star" fill size={18} className="text-accent" label="stars" />
             </Spec>
             <Spec value={<span className="tabular-nums">{Math.round(model.match)}%</span>} label="Fit for you" />
             <Spec value={<span className="tabular-nums">{inr(model.hourly)}</span>} label="Per hour" />
@@ -289,13 +289,13 @@ export default function SkillSheet({ model, onClose, onRent }) {
 
           {/* Plain-English after-effects */}
           <section>
-            <h3 className="flex items-center gap-1.5 text-[15px] font-semibold text-ink">
-              <Info className="h-4 w-4 text-muted" /> Good to know
+            <h3 className="eyebrow flex items-center gap-1.5">
+              <Icon name="info" size={16} /> Good to know
             </h3>
             <ul className="mt-3 space-y-2.5">
               {type.afterEffects.map((t) => (
                 <li key={t} className="flex gap-2.5 text-[14px] leading-relaxed text-ink/85">
-                  <span className="mt-[9px] h-1 w-1 shrink-0 rounded-full bg-warning" />
+                  <span className="mt-[9px] h-1 w-1 shrink-0 rounded-full bg-muted" />
                   {t}
                 </li>
               ))}
@@ -303,7 +303,7 @@ export default function SkillSheet({ model, onClose, onRent }) {
           </section>
 
           <section>
-            <h3 className="mb-2 text-[13px] text-muted">More details</h3>
+            <h3 className="eyebrow mb-2">More details</h3>
             <MoreDetails model={model} />
           </section>
         </div>
@@ -311,14 +311,14 @@ export default function SkillSheet({ model, onClose, onRent }) {
         {/* Action */}
         <div className="shrink-0 space-y-3 border-t border-line bg-canvas px-5 pb-5 pt-3">
           {queue === 'queued' ? (
-            <div className="animate-queue-pulse rounded-xl border-2 border-warning bg-warning/15 p-3.5" role="status" aria-live="polite">
+            <div className="animate-queue-pulse rounded-xl border bg-accent/10 p-3.5" role="status" aria-live="polite">
               <div className="flex items-center gap-3">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-warning text-[18px] font-semibold tabular-nums text-canvas">
+                <span className="metric flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-accent/60 text-accent">
                   {position}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="text-[15px] font-semibold text-ink">You're number {position} in line</p>
-                  <p className="text-[12px] text-ink/70">We'll hold your spot for 2 minutes when it opens.</p>
+                  <p className="text-title text-ink">You're number {position} in line</p>
+                  <p className="text-caption text-muted">We'll hold your spot for 2 minutes when it opens.</p>
                 </div>
                 <button onClick={leave} className="shrink-0 text-[13px] text-muted underline-offset-2 hover:text-ink hover:underline">
                   Leave
@@ -326,18 +326,18 @@ export default function SkillSheet({ model, onClose, onRent }) {
               </div>
               <div className="mt-3 flex gap-1" aria-hidden="true">
                 {[3, 2, 1].map((n) => (
-                  <span key={n} className={`h-1 flex-1 rounded-full ${position < n ? 'bg-warning' : 'bg-warning/25'}`} />
+                  <span key={n} className={`h-0.5 flex-1 rounded-full ${position < n ? 'bg-accent' : 'bg-line'}`} />
                 ))}
               </div>
             </div>
           ) : queue === 'idle' ? (
-            <button onClick={join} className="btn h-12 w-full border border-warning/60 text-warning hover:bg-warning/10">
-              <Clock className="h-4 w-4" /> Join waiting list · {formatWait(model.waitMins).replace('Waiting list: ', 'about ')}
+            <button onClick={join} className="btn h-12 w-full border border-accent/50 text-accent hover:bg-accent/10">
+              <Icon name="schedule" size={18} /> Join waiting list · {formatWait(model.waitMins).replace('Waiting list: ', 'about ')}
             </button>
           ) : (
             <>
               {model.waitMins > 0 && (
-                <p className="rounded-lg bg-accent/10 py-2 text-center text-[13px] font-medium text-accent">It's your turn. Your spot is ready.</p>
+                <p className="rounded-lg bg-accent/10 py-2 text-center text-[13px] text-accent">It's your turn. Your spot is ready.</p>
               )}
               <div className="grid grid-cols-3 gap-1 rounded-lg bg-surface p-1" role="radiogroup" aria-label="How long">
                 {Object.values(DURATIONS).map((d) => {

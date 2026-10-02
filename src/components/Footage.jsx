@@ -47,7 +47,10 @@ function Footage({ scene, variant = 0, src, paused = false, speed = 1, offset = 
       if (!w || !h) return;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, w, h);
+      // Muted grade keeps footage from competing with the interface.
+      ctx.filter = 'saturate(45%) brightness(0.92)';
       draw(ctx, w, h, t, variant);
+      ctx.filter = 'none';
       grade(ctx, w, h);
     });
 

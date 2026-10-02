@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Mic, Search, Star, X } from 'lucide-react';
+import Icon from '../components/Icon.jsx';
 import VaultTile from '../components/VaultTile.jsx';
 import { TypeBadge } from '../components/ModelVisuals.jsx';
 import { DOMAINS, MODELS_BY_DOMAIN, MODEL_TYPES, SUGGESTIONS, formatWait, inr, matchesQuery } from '../data/catalog.js';
@@ -34,23 +34,23 @@ function SearchBar({ query, onQuery }) {
 
   return (
     <label
-      className={`flex h-11 items-center gap-2.5 rounded-xl border bg-surface pl-3.5 pr-1.5 transition-colors focus-within:border-accent ${
-        listening ? 'border-accent' : 'border-line'
+      className={`flex h-11 items-center gap-2.5 rounded-lg border bg-surface pl-3 pr-1.5 transition-colors focus-within:border-muted/50 ${
+        listening ? 'border-accent/60' : 'border-line'
       }`}
     >
-      <Search className="h-4 w-4 shrink-0 text-muted" strokeWidth={2} />
+      <Icon name="search" size={20} className="text-muted" />
       <input
         id="skill-search"
         type="search"
         value={query}
         onChange={(e) => onQuery(e.target.value)}
         placeholder={listening ? 'Listening…' : 'Search skills, tasks, or experts...'}
-        className="min-w-0 flex-1 bg-transparent text-[15px] text-ink placeholder:text-muted focus:outline-none [&::-webkit-search-cancel-button]:hidden"
+        className="min-w-0 flex-1 bg-transparent text-[14px] text-ink placeholder:text-muted focus:outline-none [&::-webkit-search-cancel-button]:hidden"
         aria-label="Search skills, tasks, or experts"
       />
       {query && (
         <button onClick={() => onQuery('')} className="p-1 text-muted hover:text-ink" aria-label="Clear search">
-          <X className="h-4 w-4" />
+          <Icon name="close" size={18} />
         </button>
       )}
       <button
@@ -58,11 +58,11 @@ function SearchBar({ query, onQuery }) {
         onClick={listen}
         aria-label={listening ? 'Listening' : 'Search by voice'}
         aria-pressed={listening}
-        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors ${
-          listening ? 'animate-breathe bg-accent text-white' : 'text-muted hover:bg-canvas hover:text-ink'
+        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md transition-colors ${
+          listening ? 'animate-breathe bg-accent/15 text-accent' : 'text-muted hover:bg-canvas hover:text-ink'
         }`}
       >
-        <Mic className="h-4 w-4" />
+        <Icon name="mic" size={20} />
       </button>
     </label>
   );
@@ -79,7 +79,7 @@ function Suggestions({ query, onQuery }) {
             onClick={() => onQuery(on ? '' : s)}
             aria-pressed={on}
             className={`h-7 shrink-0 rounded-full px-3 text-[12px] transition-colors ${
-              on ? 'bg-ink text-canvas' : 'border border-line text-muted hover:text-ink'
+              on ? 'bg-accent/15 text-accent' : 'bg-surface text-muted hover:text-ink'
             }`}
           >
             {s}
@@ -92,7 +92,7 @@ function Suggestions({ query, onQuery }) {
 
 function FilterBar({ filter, onFilter }) {
   return (
-    <div className="grid grid-cols-4 gap-1 rounded-lg bg-surface p-1" role="radiogroup" aria-label="Who the skill comes from">
+    <div className="no-scrollbar flex gap-5 overflow-x-auto border-b border-line" role="radiogroup" aria-label="Who the skill comes from">
       {FILTERS.map((f) => {
         const on = filter === f.id;
         return (
@@ -101,11 +101,12 @@ function FilterBar({ filter, onFilter }) {
             role="radio"
             aria-checked={on}
             onClick={() => onFilter(f.id)}
-            className={`h-8 rounded-md px-1 text-[12px] font-medium leading-tight transition-colors ${
-              on ? 'bg-canvas text-ink' : 'text-muted hover:text-ink'
+            className={`relative shrink-0 whitespace-nowrap pb-2.5 pt-1 text-[13px] transition-colors ${
+              on ? 'font-medium text-ink' : 'text-muted hover:text-ink'
             }`}
           >
             {f.label}
+            <span className={`absolute inset-x-0 -bottom-px h-0.5 rounded-full ${on ? 'bg-accent' : 'bg-transparent'}`} />
           </button>
         );
       })}
@@ -302,8 +303,8 @@ export default function MarketplaceFrame({ onOpen, onRent }) {
       </div>
 
       <div className="flex shrink-0 items-baseline justify-between px-5 pb-1 pt-3">
-        <h2 className="text-[16px] font-semibold text-ink">{domain.label}</h2>
-        <span className="text-[12px] text-muted">Drag to browse · swipe up for more</span>
+        <h2 className="eyebrow">{domain.label}</h2>
+        <span className="text-caption text-muted">Drag to browse · swipe for more</span>
       </div>
 
       <div
@@ -323,7 +324,7 @@ export default function MarketplaceFrame({ onOpen, onRent }) {
         <DomainRail centerRow={cyl.centerRow} onJump={jumpToDomain} />
         {noResults && (
           <div className="absolute inset-x-8 top-1/2 z-20 -translate-y-1/2 rounded-xl border border-line bg-surface p-4 text-center">
-            <p className="text-[14px] font-medium text-ink">No skills match "{query}"</p>
+            <p className="text-title text-ink">No skills match "{query}"</p>
             <button onClick={() => setQuery('')} className="mt-2 text-[13px] text-accent">
               Clear search
             </button>
@@ -334,29 +335,29 @@ export default function MarketplaceFrame({ onOpen, onRent }) {
       {/* Selected skill */}
       <div className="shrink-0 border-t border-line px-5 pb-4 pt-3">
         <div className="flex items-center justify-between gap-3">
-          <p className="text-[12px] text-muted">Selected skill</p>
-          <TypeBadge type={focused.type} label={MODEL_TYPES[focused.type].label} />
+          <p className="eyebrow">Selected skill</p>
+          <TypeBadge label={MODEL_TYPES[focused.type].label} className="bg-surface" />
         </div>
-        <p className="mt-1 truncate text-[16px] font-semibold text-ink">{skillName(focused)}</p>
-        <p className="mt-0.5 flex items-center gap-1.5 text-[13px] text-muted">
-          <Star className="h-3 w-3 fill-warning text-warning" strokeWidth={0} aria-label="Rating" />
+        <p className="mt-2 truncate text-title text-ink">{skillName(focused)}</p>
+        <p className="mt-1 flex items-center gap-1 text-[12px] text-muted">
+          <Icon name="star" fill size={14} className="text-accent" label="Rating" />
           <span className="text-ink">{focused.rating}</span> ({focused.rentals}) ·{' '}
           <span className="tabular-nums">{inr(focused.hourly)}</span>/hr · <span className="tabular-nums">{Math.round(focused.match)}%</span> fit
         </p>
         <div className="mt-3 flex gap-2">
-          <button onClick={() => onOpen(focused)} disabled={!focusedOn} className="btn-secondary h-11 px-4">
+          <button onClick={() => onOpen(focused)} disabled={!focusedOn} className="btn-secondary px-4">
             Details
           </button>
           {focused.waitMins ? (
             <button
               onClick={() => onOpen(focused)}
               disabled={!focusedOn}
-              className="btn h-11 flex-1 border border-warning/60 text-warning hover:bg-warning/10"
+              className="btn flex-1 border border-accent/50 text-accent hover:bg-accent/10"
             >
-              {formatWait(focused.waitMins)}
+              <Icon name="schedule" size={18} /> {formatWait(focused.waitMins)}
             </button>
           ) : (
-            <button onClick={() => onRent('1h', focused)} disabled={!focusedOn} className="btn-primary h-11 flex-1">
+            <button onClick={() => onRent('1h', focused)} disabled={!focusedOn} className="btn-primary flex-1">
               Rent &amp; start skill
             </button>
           )}

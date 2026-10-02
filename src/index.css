@@ -4,16 +4,13 @@
 
 /* CSS-variable mirror of src/theme/tokens.js */
 :root {
-  --canvas: #0f172a;
-  --surface: #1e293b;
-  --line: #334155;
-  --ink: #f8fafc;
-  --muted: #94a3b8;
-  --accent: #0ea5e9;
-  --warning: #f59e0b;
-  --alert: #ef4444;
-  --cyan: #22d3ee;
-  --gold: #e3b341;
+  --canvas: #0b0f17;
+  --surface: #161c26;
+  --line: #222a38;
+  --ink: #f1f5f9;
+  --muted: #8e9bae;
+  --accent: #d4a359;
+  --alert: #e06d53;
   color-scheme: dark;
 }
 
@@ -24,11 +21,13 @@
     min-height: 100%;
   }
   body {
-    @apply bg-canvas font-sans text-ink antialiased;
+    @apply bg-canvas font-sans text-body text-ink antialiased;
+    font-optical-sizing: auto;
     -webkit-tap-highlight-color: transparent;
   }
   button:focus-visible,
-  input:focus-visible {
+  input:focus-visible,
+  [tabindex]:focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 2px;
   }
@@ -38,17 +37,27 @@
   .card {
     @apply rounded-xl border border-line bg-surface;
   }
+  /* Uppercase section title */
+  .eyebrow {
+    @apply text-section uppercase text-muted;
+  }
+  /* Primary numeric metric: condensed width */
+  .metric {
+    @apply text-metric tabular-nums;
+    font-stretch: 82%;
+  }
+  /* Thin monochrome tag */
+  .tag {
+    @apply inline-flex items-center gap-1 rounded-full px-2 py-1 text-tag uppercase;
+  }
   .btn {
-    @apply inline-flex h-11 items-center justify-center gap-2 rounded-lg px-4 text-[15px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex h-11 items-center justify-center gap-2 rounded-lg px-4 text-[14px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40;
   }
   .btn-primary {
-    @apply btn bg-accent text-white hover:bg-[#38BDF8] active:bg-[#0284C7];
+    @apply btn bg-accent text-canvas hover:bg-[#DEB273] active:bg-[#C29147];
   }
   .btn-secondary {
     @apply btn border border-line bg-transparent text-ink hover:bg-surface;
-  }
-  .btn-danger {
-    @apply btn border border-alert/60 bg-transparent text-alert hover:bg-alert/10;
   }
 }
 
@@ -56,15 +65,32 @@
   .preserve-3d {
     transform-style: preserve-3d;
   }
-  .backface-hidden {
-    backface-visibility: hidden;
-  }
   .no-scrollbar::-webkit-scrollbar {
     display: none;
   }
   .no-scrollbar {
     scrollbar-width: none;
   }
+}
+
+/* Material Symbols Outlined — light 300 weight to match Google Sans Flex strokes */
+.icon {
+  font-family: 'Material Symbols Outlined';
+  font-weight: normal;
+  font-style: normal;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  white-space: nowrap;
+  direction: ltr;
+  display: inline-block;
+  flex-shrink: 0;
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+  font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 20;
+}
+.icon-fill {
+  font-variation-settings: 'FILL' 1, 'wght' 300, 'GRAD' 0, 'opsz' 20;
 }
 
 @media (prefers-reduced-motion: reduce) {

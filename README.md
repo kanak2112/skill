@@ -1,7 +1,9 @@
 # Neural Skill Stream
 
-Interactive design-fiction prototype for a BCI skill-rental platform. React (Vite), Tailwind CSS,
-lucide-react, set entirely in Google Sans Flex. All people and licence numbers are fictional.
+Interactive design-fiction prototype for a BCI skill-rental platform. React (Vite) and Tailwind CSS,
+set entirely in Google Sans Flex with Material Symbols Outlined icons (weight 300). Low-chroma dark
+palette: slate surfaces, cool grey text, warm brass (#D4A359) for active state, soft coral (#E06D53)
+for warnings and stop. All people and licence numbers are fictional.
 
 ```bash
 npm install
@@ -17,7 +19,7 @@ npm run build
   domains — Culinary, Craft, Physical, Cognitive (infinite). Trackpad/wheel and arrow keys also work.
 - Search bar ("Search skills, tasks, or experts...") with simulated voice input and suggestion tags;
   results dim non-matches and bring the nearest match forward, across skill areas.
-- Filter (All / Human experts / Combined / AI generated) works the same way.
+- Filter tabs (All / Human experts / Combined / AI generated) work the same way.
 - Depth: side cards recede, scale to 82%, fade and blur slightly; they keep playing at a slower speed.
 - Tile treatments: **Personal** — cyan badge, gold verified crest, expert signature watermark.
   **Composite** — stacked layers + node-network overlay. **Synthetic** — rotating wireframe shimmer
@@ -32,9 +34,9 @@ npm run build
 - Anomaly detector (`useAnomaly.js`): fires ~8 s into a stream and every 35 s, or on demand via
   "Simulate anomaly" under the device; auto-stabilises over 6 s.
 - Movement signal and skin contact readings jitter live with sparklines.
-- Patch illustration (`Wearable.jsx`) with segmented LED ring — cyan active, amber warning, red
-  disconnected — and a stop button: hold for a 3-2-1 countdown, then the ring drains before the
-  skill disconnects. "Stop skill" uses a confirm sheet.
+- Patch (`Wearable.jsx`): thin 2px status ring (brass active, coral warning, grey disconnected)
+  around the only stop control. Hold for a 3-2-1 countdown while the ring fills and shifts from
+  brass to coral; it then drains before the skill disconnects.
 
 **03 · Post-rental diagnostic** (`src/frames/DiagnosticFrame.jsx`)
 - How well you did vs. what you kept, after-effects, and natural skill loss with the lost 14% drawn

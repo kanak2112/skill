@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Activity, CheckCircle2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import Icon from '../components/Icon.jsx';
 import Wearable, { LED } from '../components/Wearable.jsx';
 import { formatMMSS } from '../hooks/useSessionTimer.js';
 
@@ -20,40 +20,42 @@ function useLiveReading(base, spread, active, boost = 0) {
 }
 
 function Sparkline({ series, min, max, tone }) {
-  const w = 72;
-  const h = 22;
-  const pts = series.map((v, i) => {
-    const x = (i / (series.length - 1)) * w;
-    const y = h - ((Math.min(max, Math.max(min, v)) - min) / (max - min)) * h;
-    return [x, y];
-  });
+  const w = 64;
+  const h = 18;
+  const pts = series.map((v, i) => [
+    (i / (series.length - 1)) * w,
+    h - ((Math.min(max, Math.max(min, v)) - min) / (max - min)) * h,
+  ]);
   const line = pts.map(([x, y], i) => `${i ? 'L' : 'M'}${x.toFixed(1)} ${y.toFixed(1)}`).join(' ');
   const [lx, ly] = pts[pts.length - 1];
   return (
-    <svg viewBox={`-2 -2 ${w + 4} ${h + 4}`} className={`h-[26px] w-[76px] ${tone}`} aria-hidden="true">
-      <path d={`${line} L${w} ${h} L0 ${h} Z`} fill="currentColor" opacity="0.12" />
-      <path d={line} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-      <circle cx={lx} cy={ly} r="2.2" fill="currentColor" />
+    <svg viewBox={`-2 -2 ${w + 4} ${h + 4}`} className={`h-[22px] w-[68px] ${tone}`} aria-hidden="true">
+      <path d={line} fill="none" stroke="currentColor" strokeWidth="1.25" strokeLinejoin="round" opacity="0.8" />
+      <circle cx={lx} cy={ly} r="2" fill="currentColor" />
     </svg>
   );
 }
 
 function StatusBanner({ led, model }) {
   const meta = {
-    cyan: { title: 'Skill active', tint: 'bg-cyan/10', dot: 'bg-cyan animate-breathe', sub: 'Running now' },
-    amber: { title: 'Adjusting', tint: 'bg-warning/10', dot: 'bg-warning animate-breathe', sub: 'Running now' },
-    red: { title: 'Disconnected', tint: 'bg-alert/10', dot: 'bg-alert', sub: 'Skill stopped and removed' },
-    off: { title: 'Session finished', tint: 'bg-surface', dot: 'bg-muted', sub: 'Skill removed' },
+    active: { title: 'Skill active', sub: 'Running now', pulse: true },
+    warning: { title: 'Adjusting', sub: 'Running now', pulse: true },
+    disconnected: { title: 'Disconnected', sub: 'Skill stopped and removed', pulse: false },
+    off: { title: 'Session finished', sub: 'Skill removed', pulse: false },
   }[led];
   const name = model.expert ? `${model.expert} — ${model.title.replace(/ v\d.*$/, '')}` : model.title;
   return (
-    <div className={`rounded-xl p-4 ${meta.tint}`} role="status">
-      <p className={`flex items-center gap-2 text-[13px] font-medium ${LED[led].text}`}>
-        <span className={`h-2 w-2 rounded-full ${meta.dot}`} aria-hidden="true" />
+    <div role="status">
+      <p className={`eyebrow flex items-center gap-2 ${LED[led].text}`}>
+        <span
+          className={`h-1.5 w-1.5 rounded-full ${meta.pulse ? 'animate-breathe' : ''}`}
+          style={{ background: LED[led].color }}
+          aria-hidden="true"
+        />
         {meta.title}
       </p>
-      <p className="mt-1.5 text-[17px] font-semibold leading-snug text-ink">{name}</p>
-      <p className="mt-0.5 text-[13px] text-muted">{meta.sub}</p>
+      <p className="mt-2 text-[18px] font-medium leading-snug tracking-[-0.01em] text-ink">{name}</p>
+      <p className="mt-0.5 text-caption text-muted">{meta.sub}</p>
     </div>
   );
 }
@@ -62,21 +64,21 @@ function AnomalyAlert({ phase, progress }) {
   if (phase === 'none') return null;
   if (phase === 'resolved') {
     return (
-      <div className="flex items-center gap-3 rounded-xl bg-accent/10 p-4" role="status">
-        <CheckCircle2 className="h-4 w-4 shrink-0 text-accent" />
-        <p className="text-[14px] text-ink">Signals are back to normal.</p>
+      <div className="flex items-center gap-2.5 rounded-xl border border-line bg-surface px-4 py-3" role="status">
+        <Icon name="check_circle" size={18} className="text-accent" />
+        <p className="text-[13px] text-ink">Signals are back to normal.</p>
       </div>
     );
   }
   return (
-    <div className="rounded-xl border border-warning/50 bg-warning/10 p-4" role="alert">
-      <div className="flex gap-3">
-        <Activity className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
+    <div className="rounded-xl border border-alert/40 bg-alert/[0.06] p-4" role="alert">
+      <div className="flex gap-2.5">
+        <Icon name="vital_signs" size={18} className="text-alert" />
         <div className="min-w-0 flex-1">
-          <p className="text-[14px] font-semibold leading-snug text-warning">Unusual muscle signals — adjusting automatically</p>
-          <p className="mt-1 text-[13px] text-ink/75">You may feel a slight twitch. No need to stop.</p>
-          <div className="mt-3 h-1 overflow-hidden rounded-full bg-canvas">
-            <div className="h-full rounded-full bg-warning transition-[width] duration-100" style={{ width: `${progress * 100}%` }} />
+          <p className="text-title text-ink">Unusual muscle signals — adjusting automatically</p>
+          <p className="mt-0.5 text-caption text-muted">You may feel a slight twitch. No need to stop.</p>
+          <div className="mt-3 h-0.5 overflow-hidden rounded-full bg-line">
+            <div className="h-full rounded-full bg-alert transition-[width] duration-100" style={{ width: `${progress * 100}%` }} />
           </div>
         </div>
       </div>
@@ -99,15 +101,15 @@ function Telemetry({ session, anomaly }) {
 
   return (
     <section className="card p-5">
-      <p className="text-[13px] text-muted">Time left</p>
+      <p className="eyebrow">Time left</p>
       <p
-        className={`mt-1 text-[56px] font-semibold leading-none tracking-tight tabular-nums ${live ? 'text-ink' : 'text-muted'}`}
+        className={`metric mt-2 text-[56px] font-light ${live ? 'text-ink' : 'text-muted'}`}
         aria-label={`${Math.ceil(remaining / 60)} minutes left`}
       >
         {formatMMSS(remaining)}
       </p>
       <div
-        className="mt-4 h-1 overflow-hidden rounded-full bg-canvas"
+        className="mt-4 h-0.5 overflow-hidden rounded-full bg-line"
         role="progressbar"
         aria-valuenow={Math.round(pct)}
         aria-valuemin={0}
@@ -124,8 +126,8 @@ function Telemetry({ session, anomaly }) {
           <div key={r.label} className="flex items-center justify-between gap-3 py-3 last:pb-0">
             <dt className="text-[14px] text-ink">{r.label}</dt>
             <dd className="flex items-center gap-3">
-              {live && <Sparkline series={r.reading.series} min={r.min} max={r.max} tone={r.warn ? 'text-warning' : 'text-accent'} />}
-              <span className={`w-14 text-right text-[15px] font-semibold ${r.warn ? 'text-warning' : 'text-ink'}`}>
+              {live && <Sparkline series={r.reading.series} min={r.min} max={r.max} tone={r.warn ? 'text-alert' : 'text-muted'} />}
+              <span className={`w-14 text-right text-[15px] ${r.warn ? 'text-alert' : 'text-ink'}`}>
                 {r.reading.value == null ? '—' : `${Math.round(r.reading.value)} ${r.unit}`}
               </span>
             </dd>
@@ -136,93 +138,38 @@ function Telemetry({ session, anomaly }) {
   );
 }
 
-function ConfirmSheet({ onCancel, onConfirm }) {
-  const cancelRef = useRef(null);
-
-  useEffect(() => {
-    cancelRef.current?.focus();
-    const onKey = (e) => e.key === 'Escape' && onCancel();
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onCancel]);
-
-  return (
-    <div className="absolute inset-0 z-50 flex items-end bg-canvas/70" onClick={onCancel}>
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="confirm-title"
-        className="w-full rounded-t-2xl border-t border-line bg-surface p-5 pb-6"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="mx-auto mb-5 h-1 w-10 rounded-full bg-line" aria-hidden="true" />
-        <h2 id="confirm-title" className="text-[18px] font-semibold text-ink">
-          Stop skill &amp; disconnect?
-        </h2>
-        <p className="mt-2 text-[14px] leading-relaxed text-muted">
-          The skill stops right away. Any refund follows the rental terms.
-        </p>
-        <div className="mt-6 grid grid-cols-2 gap-3">
-          <button ref={cancelRef} onClick={onCancel} className="btn-secondary">
-            Keep going
-          </button>
-          <button onClick={onConfirm} className="btn bg-alert text-white hover:bg-[#F87171]">
-            Disconnect
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export default function ActiveSessionFrame({ session, anomaly, onTerminate, onViewReport }) {
-  const [confirming, setConfirming] = useState(false);
   const live = session.status === 'active';
-  // Stable reference: the frame re-renders every timer tick, and the sheet's
-  // focus/keydown effect must not re-run (and steal focus) on each one.
-  const closeSheet = useCallback(() => setConfirming(false), []);
-
   const led =
-    session.status === 'terminated' ? 'red' : !live ? 'off' : anomaly.phase === 'stabilizing' ? 'amber' : 'cyan';
-
-  const confirmStop = () => {
-    setConfirming(false);
-    onTerminate();
-  };
+    session.status === 'terminated' ? 'disconnected' : !live ? 'off' : anomaly.phase === 'stabilizing' ? 'warning' : 'active';
 
   return (
-    <div className="space-y-4 p-5">
+    <div className="space-y-5 p-5">
       <StatusBanner led={led} model={session.model} />
       <AnomalyAlert phase={anomaly.phase} progress={anomaly.progress} />
       <Telemetry session={session} anomaly={anomaly} />
 
-      <section className="card p-5">
-        <h2 className="text-[15px] font-medium text-ink">Your patch</h2>
-        <p className="mt-0.5 text-[13px] text-muted">The light shows the patch's status. Hold the button to stop.</p>
-        <div className="mt-5 flex justify-center">
+      <section className="card px-5 pb-5 pt-4">
+        <p className="eyebrow">Your patch</p>
+        <div className="mt-4 flex justify-center">
           <Wearable led={led} onKill={onTerminate} disabled={!live} />
         </div>
-        <ul className="mt-5 grid grid-cols-3 gap-2 text-[12px]">
-          {['cyan', 'amber', 'red'].map((k) => (
+        <ul className="mt-5 flex justify-center gap-5 text-caption">
+          {['active', 'warning', 'disconnected'].map((k) => (
             <li key={k} className={`flex items-center gap-1.5 ${led === k ? 'text-ink' : 'text-muted'}`}>
-              <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: LED[k].color, opacity: led === k ? 1 : 0.4 }} />
+              <span className="h-1.5 w-1.5 rounded-full" style={{ background: LED[k].color, opacity: led === k ? 1 : 0.45 }} />
               {LED[k].label}
             </li>
           ))}
         </ul>
       </section>
 
-      {live ? (
-        <button onClick={() => setConfirming(true)} className="btn-danger h-12 w-full">
-          Stop skill
-        </button>
-      ) : (
-        <button onClick={onViewReport} className="btn-primary h-12 w-full">
+      {!live && (
+        <button onClick={onViewReport} className="btn-secondary h-12 w-full">
           See session summary
+          <Icon name="chevron_right" size={18} />
         </button>
       )}
-
-      {confirming && <ConfirmSheet onCancel={closeSheet} onConfirm={confirmStop} />}
     </div>
   );
 }
