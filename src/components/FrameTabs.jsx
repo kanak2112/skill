@@ -1,8 +1,8 @@
 // Prototype navigation — sits outside the device and is not part of the app UI.
 export const FRAMES = [
-  { id: 'market', label: 'Marketplace' },
-  { id: 'session', label: 'Session' },
-  { id: 'report', label: 'Diagnostic' },
+  { id: 'market', label: 'Skill vault' },
+  { id: 'session', label: 'Wearable' },
+  { id: 'report', label: 'Report' },
 ];
 
 export default function FrameTabs({ active, onChange }) {

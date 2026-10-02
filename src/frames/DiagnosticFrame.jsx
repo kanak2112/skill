@@ -1,50 +1,35 @@
 import { useState } from 'react';
-import { Check } from 'lucide-react';
+import { Check, MessageSquareText, Hand, TrendingDown } from 'lucide-react';
 
 const SESSION_ID = '88492';
 
-const METRICS = [
-  { key: 'execution', value: '99.2%', label: 'Task Execution', tone: 'text-ink' },
-  { key: 'retention', value: '2.1%', label: 'Skill Retention', tone: 'text-warning' },
-];
-
-const SIDE_EFFECTS = [
+const TRACES = [
   {
     key: 'motor',
-    title: 'Motor Drift',
+    icon: Hand,
+    title: 'Motor pattern drift',
     value: '14',
-    suffix: 'hrs remaining',
-    tone: 'text-warning',
-    note: 'Mild hand tremor detected post-session.',
+    unit: 'h',
+    note: 'Hand tremor expected',
   },
   {
     key: 'behavioral',
-    title: 'Behavioral Trace',
-    value: '18',
-    suffix: 'hrs remaining',
-    tone: 'text-warning',
-    note: 'Source speech tone & cadence persisted.',
-  },
-  {
-    key: 'regression',
-    title: 'Unassisted Skill Regression',
-    value: '-14%',
-    tone: 'text-alert',
-    note: 'Temporary decay in unassisted baseline performance.',
+    icon: MessageSquareText,
+    title: 'Behavioral trace',
+    value: '+18',
+    unit: 'h',
+    note: 'Speech cadence persistence',
   },
 ];
 
-function exportData() {
+function exportData(skill) {
   const payload = {
     sessionId: SESSION_ID,
     duration: '1h 00m',
-    skill: 'Chef Arjun Mehra — Culinary Knife Techniques',
-    metrics: { taskExecution: 0.992, skillRetention: 0.021 },
-    sideEffects: SIDE_EFFECTS.map(({ title, value, suffix, note }) => ({
-      title,
-      value: suffix ? `${value} ${suffix}` : value,
-      note,
-    })),
+    skill,
+    performance: { taskProficiency: 0.992, skillRetention: 0.021 },
+    residualArtifacts: TRACES.map(({ title, value, unit, note }) => ({ title, duration: `${value}${unit}`, note })),
+    unassistedRegression: -0.14,
     exportedAt: new Date().toISOString(),
   };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
@@ -58,11 +43,26 @@ function exportData() {
   URL.revokeObjectURL(url);
 }
 
-export default function DiagnosticFrame({ onDone }) {
+function SplitBar({ label, value, pct, tone, bar }) {
+  return (
+    <div>
+      <div className="flex items-baseline justify-between">
+        <span className="text-[14px] text-ink">{label}</span>
+        <span className={`text-[22px] font-semibold tracking-tight tabular-nums ${tone}`}>{value}</span>
+      </div>
+      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-canvas">
+        <div className={`h-full rounded-full ${bar}`} style={{ width: `${Math.max(pct, 1.5)}%` }} />
+      </div>
+    </div>
+  );
+}
+
+export default function DiagnosticFrame({ session, onDone }) {
   const [exported, setExported] = useState(false);
+  const skill = session.model.profile;
 
   const handleExport = () => {
-    exportData();
+    exportData(skill);
     setExported(true);
     setTimeout(() => setExported(false), 2000);
   };
@@ -70,37 +70,69 @@ export default function DiagnosticFrame({ onDone }) {
   return (
     <div className="space-y-5 p-5">
       <header>
-        <h2 className="text-[22px] font-semibold tracking-tight text-ink">Session Diagnostic</h2>
-        <p className="mt-1 text-[14px] text-muted">
-          Duration: <span className="tabular-nums">1</span>h <span className="tabular-nums">00</span>m
+        <h2 className="text-[22px] font-semibold tracking-tight text-ink">Post-rental diagnostic</h2>
+        <p className="mt-1 text-[14px] text-muted">{skill}</p>
+        <p className="mt-0.5 text-[13px] text-muted">
+          Duration <span className="tabular-nums">1</span>h <span className="tabular-nums">00</span>m · Session{' '}
+          {SESSION_ID}
         </p>
       </header>
 
-      <div className="grid grid-cols-2 gap-3">
-        {METRICS.map((m) => (
-          <div key={m.key} className="card p-4">
-            <p className={`text-[30px] font-semibold leading-none tracking-tight tabular-nums ${m.tone}`}>{m.value}</p>
-            <p className="mt-2 text-[13px] text-muted">{m.label}</p>
-          </div>
-        ))}
-      </div>
+      <section className="card space-y-5 p-5">
+        <div>
+          <h3 className="text-[14px] font-medium text-ink">Performance vs. retention</h3>
+          <p className="mt-0.5 text-[13px] text-muted">How well you performed, and how much of it stayed with you.</p>
+        </div>
+        <SplitBar label="Task proficiency" value="99.2%" pct={99.2} tone="text-ink" bar="bg-accent" />
+        <SplitBar label="Skill retention" value="2.1%" pct={2.1} tone="text-warning" bar="bg-warning" />
+      </section>
 
       <section>
-        <h3 className="mb-2 text-[14px] font-medium text-muted">Side effects &amp; decay</h3>
+        <h3 className="mb-2 text-[14px] font-medium text-muted">Behavioral traces &amp; residual artifacts</h3>
         <ul className="card divide-y divide-line px-5">
-          {SIDE_EFFECTS.map((s) => (
-            <li key={s.key} className="py-4">
-              <div className="flex items-baseline justify-between gap-3">
-                <span className="text-[15px] font-medium text-ink">{s.title}</span>
-                <span className="shrink-0 text-[14px]">
-                  <span className={`font-semibold tabular-nums ${s.tone}`}>{s.value}</span>
-                  {s.suffix && <span className="ml-1 text-muted">{s.suffix}</span>}
+          {TRACES.map((t) => {
+            const Icon = t.icon;
+            return (
+              <li key={t.key} className="flex items-center gap-3 py-4">
+                <Icon className="h-4 w-4 shrink-0 text-muted" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-[15px] font-medium text-ink">{t.title}</p>
+                  <p className="text-[13px] text-muted">{t.note}</p>
+                </div>
+                <span className="text-[17px] font-semibold text-warning">
+                  <span className="tabular-nums">{t.value}</span>
+                  {t.unit}
                 </span>
-              </div>
-              <p className="mt-1 text-[13px] leading-relaxed text-muted">{s.note}</p>
-            </li>
-          ))}
+              </li>
+            );
+          })}
         </ul>
+      </section>
+
+      <section className="card p-5">
+        <div className="flex items-start gap-3">
+          <TrendingDown className="mt-1 h-4 w-4 shrink-0 text-alert" />
+          <div className="flex-1">
+            <h3 className="text-[15px] font-medium text-ink">Unassisted competency regression</h3>
+            <p className="mt-0.5 text-[13px] text-muted">Temporary loss of natural ability from reliance on rented skills.</p>
+          </div>
+          <span className="text-[22px] font-semibold tracking-tight tabular-nums text-alert">-14%</span>
+        </div>
+        <div className="mt-4 space-y-1.5 text-[12px] text-muted">
+          <div className="flex items-center gap-3">
+            <span className="w-16 shrink-0">Before</span>
+            <div className="h-1.5 flex-1 rounded-full bg-muted/40" />
+            <span className="w-9 text-right tabular-nums">100%</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="w-16 shrink-0">After</span>
+            <div className="h-1.5 flex-1">
+              <div className="h-full w-[86%] rounded-full bg-alert/80" />
+            </div>
+            <span className="w-9 text-right tabular-nums">86%</span>
+          </div>
+        </div>
+        <p className="mt-3 text-[13px] text-ink/80">-14% baseline unassisted proficiency</p>
       </section>
 
       <div className="grid grid-cols-2 gap-3">

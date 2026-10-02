@@ -1,196 +1,256 @@
-import { useMemo, useState } from 'react';
-import { ChevronRight, Search, Star, X } from 'lucide-react';
-import { DURATIONS } from '../hooks/useSessionTimer.js';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { ChevronRight, MoveHorizontal, MoveVertical } from 'lucide-react';
+import VaultTile from '../components/VaultTile.jsx';
+import { TypeBadge } from '../components/ModelVisuals.jsx';
+import { DOMAINS, MODELS_BY_DOMAIN, MODEL_TYPES, inr } from '../data/catalog.js';
+import { mod, normDeg, useCylinder } from '../hooks/useCylinder.js';
 
-const CATEGORIES = [
-  { id: 'all', label: 'All' },
-  { id: 'personal', label: 'Personal' },
-  { id: 'composite', label: 'Composite' },
-];
+const SLOTS = 8;
+const FILTERS = [{ id: 'all', label: 'All' }, ...Object.values(MODEL_TYPES).map((t) => ({ id: t.id, label: t.label }))];
 
-const SKILLS = [
-  {
-    id: 'arjun-knife',
-    category: 'personal',
-    title: 'Chef Arjun Mehra — Culinary Knife Techniques',
-    subtitle: 'Motor Cortex Mapping',
-    profile: 'Chef Arjun Mehra — Knife Prep',
-    rating: '4.9',
-    reviews: '14k',
-    match: '96.4%',
-    hourlyRate: 1850,
-  },
-  {
-    id: 'sobo-navigation',
-    category: 'composite',
-    title: 'South Mumbai Navigation & Vernacular',
-    profile: 'South Mumbai Navigation & Vernacular',
-    match: '94%',
-    hourlyRate: 120,
-  },
-];
+const modelAt = (row, slot) => {
+  const list = MODELS_BY_DOMAIN[DOMAINS[mod(row, DOMAINS.length)].id];
+  return list[mod(slot, list.length)];
+};
 
-const inr = (n) => `₹${Math.round(n).toLocaleString('en-IN')}`;
-
-function SearchBar({ query, onQuery }) {
+function FilterBar({ filter, onFilter }) {
+  const active = MODEL_TYPES[filter];
   return (
-    <label className="flex h-11 items-center gap-3 rounded-lg border border-line bg-surface px-3.5 focus-within:border-accent">
-      <Search className="h-4 w-4 shrink-0 text-muted" strokeWidth={2} />
-      <input
-        type="text"
-        value={query}
-        onChange={(e) => onQuery(e.target.value)}
-        placeholder="Search skills..."
-        className="w-full bg-transparent text-[15px] text-ink placeholder:text-muted focus:outline-none"
-        aria-label="Search skills"
-      />
-      {query && (
-        <button onClick={() => onQuery('')} className="text-muted hover:text-ink" aria-label="Clear search">
-          <X className="h-4 w-4" />
-        </button>
-      )}
-    </label>
+    <div className="shrink-0 px-5 pt-4">
+      <div className="grid grid-cols-4 gap-1 rounded-lg bg-surface p-1" role="radiogroup" aria-label="Model provenance">
+        {FILTERS.map((f) => {
+          const on = filter === f.id;
+          return (
+            <button
+              key={f.id}
+              role="radio"
+              aria-checked={on}
+              onClick={() => onFilter(f.id)}
+              className={`h-8 rounded-md text-[13px] font-medium transition-colors ${
+                on ? 'bg-canvas text-ink' : 'text-muted hover:text-ink'
+              }`}
+            >
+              {f.label}
+            </button>
+          );
+        })}
+      </div>
+      <p className="mt-2 min-h-[50px] text-[12px] leading-snug text-muted">
+        {active ? (
+          <>
+            <span className="font-medium text-ink">{active.paradigm}.</span> {active.copy}
+          </>
+        ) : (
+          'Every model in the vault, across all three provenance paradigms.'
+        )}
+      </p>
+    </div>
   );
 }
 
-function CategoryFilter({ category, onCategory }) {
+function DomainRail({ centerRow, onJump }) {
+  const current = mod(centerRow, DOMAINS.length);
   return (
-    <div className="flex gap-2" role="tablist" aria-label="Category">
-      {CATEGORIES.map((c) => {
-        const active = category === c.id;
-        return (
-          <button
-            key={c.id}
-            role="tab"
-            aria-selected={active}
-            onClick={() => onCategory(c.id)}
-            className={`h-8 rounded-full px-4 text-[13px] font-medium transition-colors ${
-              active ? 'bg-ink text-canvas' : 'border border-line text-muted hover:text-ink'
+    <div className="absolute right-1.5 top-1/2 z-20 flex -translate-y-1/2 flex-col gap-1.5 rounded-full bg-canvas/70 px-0.5 py-1.5 backdrop-blur-sm" role="tablist" aria-label="Skill domain">
+      {DOMAINS.map((d, i) => (
+        <button
+          key={d.id}
+          role="tab"
+          aria-selected={i === current}
+          aria-label={d.label}
+          onClick={() => onJump(i)}
+          className="group flex h-4 w-4 items-center justify-center"
+        >
+          <span
+            className={`block rounded-full transition-all ${
+              i === current ? 'h-4 w-1.5 bg-ink' : 'h-1.5 w-1.5 bg-muted/60 group-hover:bg-muted'
             }`}
-          >
-            {c.label}
-          </button>
-        );
-      })}
+          />
+        </button>
+      ))}
     </div>
   );
 }
 
-function Spec({ label, children }) {
+export default function MarketplaceFrame({ onOpen }) {
+  const stageRef = useRef(null);
+  const [size, setSize] = useState({ w: 390, h: 520 });
+  const [filter, setFilter] = useState('all');
+  const openTimer = useRef(0);
+
+  useLayoutEffect(() => {
+    const el = stageRef.current;
+    const ro = new ResizeObserver(([e]) => setSize({ w: e.contentRect.width, h: e.contentRect.height }));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const tileW = Math.round(Math.min(172, size.w * 0.44));
+  const tileH = Math.round(tileW * 1.4);
+  const stepRad = (2 * Math.PI) / SLOTS;
+  const spacing = tileW + 22;
+  const radius = spacing / stepRad;
+  const rowPx = tileH + 40;
+
+  const matches = useCallback((m) => filter === 'all' || m.type === filter, [filter]);
+
+  const cyl = useCylinder({
+    slots: SLOTS,
+    degPerPx: 360 / SLOTS / spacing,
+    rowPx,
+    onTap: ({ row, slot }) => {
+      const m = modelAt(row, slot);
+      if (!matches(m)) return;
+      clearTimeout(openTimer.current);
+      const centred = row === cyl.centerRow && slot === cyl.centerSlot;
+      cyl.focus(row, slot);
+      openTimer.current = setTimeout(() => onOpen(m), centred ? 0 : 380);
+    },
+  });
+
+  useEffect(() => cyl.attachWheel(stageRef.current), [cyl.attachWheel]);
+  useEffect(() => () => clearTimeout(openTimer.current), []);
+
+  // When the filter hides the centred tile, rotate to the nearest match.
+  useEffect(() => {
+    if (matches(modelAt(cyl.centerRow, cyl.centerSlot))) return;
+    for (const d of [1, -1, 2, -2, 3, -3, 4]) {
+      if (matches(modelAt(cyl.centerRow, cyl.centerSlot + d))) {
+        cyl.focus(cyl.centerRow, mod(cyl.centerSlot + d, SLOTS));
+        return;
+      }
+    }
+  }, [filter]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const jumpToDomain = (i) => {
+    const cur = mod(cyl.centerRow, DOMAINS.length);
+    let delta = i - cur;
+    if (delta > 2) delta -= 4;
+    if (delta < -2) delta += 4;
+    cyl.moveRows(delta);
+  };
+
+  const onKeyDown = (e) => {
+    const map = { ArrowLeft: () => cyl.rotateBy(-1), ArrowRight: () => cyl.rotateBy(1), ArrowUp: () => cyl.moveRows(-1), ArrowDown: () => cyl.moveRows(1) };
+    if (map[e.key]) {
+      e.preventDefault();
+      map[e.key]();
+    } else if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      if (matches(focused)) onOpen(focused);
+    }
+  };
+
+  const focused = modelAt(cyl.centerRow, cyl.centerSlot);
+  const domain = DOMAINS[mod(cyl.centerRow, DOMAINS.length)];
+
+  // Rows within view (infinite in both directions).
+  const rows = [];
+  for (let k = Math.floor(cyl.v) - 1; k <= Math.floor(cyl.v) + 2; k++) {
+    const dk = k - cyl.v;
+    if (Math.abs(dk) > 1.6) continue;
+    const tiles = [];
+    for (let i = 0; i < SLOTS; i++) {
+      const rel = normDeg(i * cyl.step - cyl.rot);
+      if (Math.abs(rel) > 100) continue;
+      const r = (rel * Math.PI) / 180;
+      const x = radius * Math.sin(r);
+      const z = radius * (1 - Math.cos(r));
+      const m = modelAt(k, i);
+      const on = matches(m);
+      const shade = Math.min(Math.abs(rel) / 60, 1) * 0.45;
+      tiles.push(
+        <div
+          key={i}
+          data-slot={on ? i : undefined}
+          data-row={on ? k : undefined}
+          className={`absolute left-1/2 top-1/2 transition-opacity duration-300 ${on ? 'cursor-pointer' : 'pointer-events-none'}`}
+          style={{
+            width: tileW,
+            height: tileH,
+            marginLeft: -tileW / 2,
+            marginTop: -tileH / 2,
+            transform: `translate3d(${x}px,0,${z}px) rotateY(${-rel / 3}deg)`,
+            opacity: on ? 1 : 0.16,
+            filter: on ? undefined : 'grayscale(1)',
+          }}
+        >
+          <VaultTile model={m} offset={i * 0.37 + mod(k, DOMAINS.length) * 1.3} />
+          <div className="pointer-events-none absolute inset-0 rounded-xl bg-canvas" style={{ opacity: shade }} />
+        </div>,
+      );
+    }
+    rows.push(
+      <div
+        key={k}
+        className="preserve-3d absolute inset-0"
+        style={{
+          transform: `translate3d(0,${dk * rowPx}px,${-Math.abs(dk) * 60}px) rotateX(${dk * 10}deg)`,
+          opacity: 1 - Math.min(Math.abs(dk), 1.4) * 0.5,
+        }}
+        aria-hidden={Math.round(dk) !== 0}
+      >
+        {tiles}
+      </div>,
+    );
+  }
+
   return (
-    <div>
-      <dt className="text-[13px] text-muted">{label}</dt>
-      <dd className="mt-1 text-[17px] font-semibold text-ink">{children}</dd>
-    </div>
-  );
-}
+    <div className="flex h-full flex-col">
+      <FilterBar filter={filter} onFilter={setFilter} />
 
-function PrimarySkillCard({ skill, onRent }) {
-  const [duration, setDuration] = useState('1h');
-  const total = skill.hourlyRate * DURATIONS[duration].multiplier;
-
-  return (
-    <article className="card p-5">
-      <span className="inline-flex rounded-md bg-warning/10 px-2 py-1 text-[12px] font-medium text-warning">
-        Class-III Model
-      </span>
-
-      <h2 className="mt-3 text-[18px] font-semibold leading-snug text-ink">{skill.title}</h2>
-      <p className="mt-1 text-[14px] text-muted">{skill.subtitle}</p>
-
-      <dl className="mt-5 grid grid-cols-3 gap-4 border-t border-line pt-4">
-        <Spec label="Rating">
-          <span className="inline-flex items-center gap-1">
-            {skill.rating}
-            <Star className="h-3.5 w-3.5 fill-warning text-warning" strokeWidth={0} aria-label="stars" />
-            <span className="text-[13px] font-normal text-muted">({skill.reviews})</span>
+      <div className="flex shrink-0 items-baseline justify-between px-5 pb-1">
+        <h2 className="text-[17px] font-semibold text-ink">{domain.label}</h2>
+        <span className="flex items-center gap-3 text-[11px] text-muted">
+          <span className="flex items-center gap-1">
+            <MoveHorizontal className="h-3 w-3" /> Rotate
           </span>
-        </Spec>
-        <Spec label="Neural match">
-          <span className="tabular-nums">{skill.match}</span>
-        </Spec>
-        <Spec label="Rate">
-          <span className="tabular-nums">{inr(skill.hourlyRate)}</span>
-          <span className="text-[13px] font-normal text-muted">/hr</span>
-        </Spec>
-      </dl>
+          <span className="flex items-center gap-1">
+            <MoveVertical className="h-3 w-3" /> Domains
+          </span>
+        </span>
+      </div>
 
-      <div className="mt-5">
-        <p className="mb-2 text-[13px] text-muted">Duration</p>
-        <div className="grid grid-cols-3 gap-1 rounded-lg bg-canvas p-1" role="radiogroup" aria-label="Duration">
-          {Object.values(DURATIONS).map((d) => {
-            const active = duration === d.label;
-            return (
-              <button
-                key={d.label}
-                role="radio"
-                aria-checked={active}
-                onClick={() => setDuration(d.label)}
-                className={`h-9 rounded-md text-[14px] font-medium tabular-nums transition-colors ${
-                  active ? 'bg-surface text-ink' : 'text-muted hover:text-ink'
-                }`}
-              >
-                {d.label}
-              </button>
-            );
-          })}
+      <div
+        ref={stageRef}
+        tabIndex={0}
+        role="application"
+        aria-roledescription="Cylindrical skill carousel"
+        aria-label={`${domain.label} skills. Use arrow keys to browse, Enter to open.`}
+        onKeyDown={onKeyDown}
+        {...cyl.handlers}
+        className={`relative min-h-0 flex-1 select-none overflow-hidden outline-none ${cyl.dragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+        style={{ perspective: '900px', touchAction: 'none' }}
+      >
+        <div className="preserve-3d absolute inset-0">{rows}</div>
+        {/* Edge fades suggest the cylinder continues past the viewport */}
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-10 bg-gradient-to-b from-canvas to-transparent" />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-10 bg-gradient-to-t from-canvas to-transparent" />
+        <DomainRail centerRow={cyl.centerRow} onJump={jumpToDomain} />
+      </div>
+
+      {/* Focused tile caption */}
+      <div className="shrink-0 border-t border-line px-5 py-4">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <TypeBadge type={focused.type} label={MODEL_TYPES[focused.type].label} />
+              <span className="truncate text-[12px] text-muted">{focused.expert ?? (focused.trainedOn ? `Trained on ${focused.trainedOn}` : 'Machine-generated')}</span>
+            </div>
+            <p className="mt-1.5 truncate text-[15px] font-semibold text-ink">{focused.title}</p>
+            <p className="mt-0.5 text-[12px] text-muted">
+              <span className="tabular-nums">{inr(focused.hourly)}</span>/hr · <span className="tabular-nums">{focused.match}%</span> match
+            </p>
+          </div>
+          <button
+            onClick={() => onOpen(focused)}
+            disabled={!matches(focused)}
+            className="btn-primary h-10 shrink-0 px-3.5 text-[14px]"
+          >
+            Details <ChevronRight className="-mr-1 h-4 w-4" />
+          </button>
         </div>
       </div>
-
-      <button onClick={() => onRent(duration, skill.profile)} className="btn-primary mt-5 h-12 w-full">
-        Rent Skill — <span className="tabular-nums">{inr(total)}</span>
-      </button>
-    </article>
-  );
-}
-
-function SecondaryListing({ skill, onRent }) {
-  return (
-    <button
-      onClick={() => onRent('1h', skill.profile)}
-      className="card flex w-full items-center justify-between gap-3 p-5 text-left transition-colors hover:border-muted/50"
-    >
-      <div className="min-w-0">
-        <h3 className="text-[16px] font-semibold leading-snug text-ink">{skill.title}</h3>
-        <p className="mt-1.5 text-[13px] text-muted">
-          Composite <span aria-hidden="true">•</span>{' '}
-          <span className="tabular-nums">{inr(skill.hourlyRate)}</span>/hr <span aria-hidden="true">•</span>{' '}
-          <span className="tabular-nums">{skill.match}</span> Match
-        </p>
-      </div>
-      <ChevronRight className="h-5 w-5 shrink-0 text-muted" strokeWidth={1.75} />
-    </button>
-  );
-}
-
-export default function MarketplaceFrame({ onRent }) {
-  const [query, setQuery] = useState('');
-  const [category, setCategory] = useState('all');
-
-  const visible = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return SKILLS.filter(
-      (s) =>
-        (category === 'all' || s.category === category) &&
-        (!q || [s.title, s.subtitle].filter(Boolean).some((f) => f.toLowerCase().includes(q))),
-    );
-  }, [query, category]);
-
-  const primary = visible.find((s) => s.category === 'personal');
-  const secondary = visible.filter((s) => s.category === 'composite');
-
-  return (
-    <div className="space-y-5 p-5">
-      <div className="space-y-3">
-        <SearchBar query={query} onQuery={setQuery} />
-        <CategoryFilter category={category} onCategory={setCategory} />
-      </div>
-
-      {primary && <PrimarySkillCard skill={primary} onRent={onRent} />}
-      {secondary.map((s) => (
-        <SecondaryListing key={s.id} skill={s} onRent={onRent} />
-      ))}
-      {visible.length === 0 && <p className="py-10 text-center text-[14px] text-muted">No skills match your search.</p>}
     </div>
   );
 }

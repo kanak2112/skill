@@ -10,6 +10,8 @@ export const colors = {
   accent: '#0EA5E9', // Active accent
   warning: '#F59E0B', // Amber
   alert: '#EF4444', // Red
+  cyan: '#22D3EE', // Personal-model badge / wearable LED "active"
+  gold: '#E3B341', // Verified-creator crest
 };
 
 export const fonts = {

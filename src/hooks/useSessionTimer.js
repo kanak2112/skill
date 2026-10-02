@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { DEFAULT_MODEL } from '../data/catalog.js';
 
 export const DURATIONS = {
   '15m': { label: '15m', seconds: 15 * 60, multiplier: 0.25 },
@@ -7,14 +8,12 @@ export const DURATIONS = {
 };
 
 // Demo boot state: a 1h stream already in progress with 42:19 remaining.
-export const DEFAULT_PROFILE = 'Chef Arjun Mehra — Knife Prep';
-
 const DEMO_SESSION = {
   durationKey: '1h',
   total: 3600,
   remaining: 42 * 60 + 19,
   status: 'active',
-  profile: DEFAULT_PROFILE,
+  model: DEFAULT_MODEL,
 };
 
 /**
@@ -37,9 +36,9 @@ export function useSessionTimer() {
     return () => clearInterval(id);
   }, [session.status]);
 
-  const start = useCallback((durationKey, profile = DEFAULT_PROFILE) => {
+  const start = useCallback((durationKey, model = DEFAULT_MODEL) => {
     const { seconds } = DURATIONS[durationKey];
-    setSession({ durationKey, total: seconds, remaining: seconds, status: 'active', profile });
+    setSession({ durationKey, total: seconds, remaining: seconds, status: 'active', model });
   }, []);
 
   const terminate = useCallback(() => {
