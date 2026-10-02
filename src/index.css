@@ -1,0 +1,104 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* CSS-variable mirror of src/theme/tokens.js */
+:root {
+  --syn-canvas: #070a0f;
+  --syn-surface: #0d121d;
+  --syn-hairline: #1e293b;
+  --syn-frame: #334155;
+  --syn-cyan: #06b6d4;
+  --syn-amber: #f59e0b;
+  --syn-red: #ef4444;
+  --syn-ok: #10b981;
+  --syn-ink: #f8fafc;
+  --syn-muted: #64748b;
+  color-scheme: dark;
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    min-height: 100%;
+  }
+  body {
+    @apply bg-syn-canvas text-syn-ink font-sans antialiased;
+    -webkit-tap-highlight-color: transparent;
+  }
+  ::selection {
+    background: var(--syn-cyan);
+    color: var(--syn-canvas);
+  }
+  button:focus-visible,
+  input:focus-visible {
+    outline: 1px solid var(--syn-cyan);
+    outline-offset: 1px;
+  }
+}
+
+@layer components {
+  /* Micro label — mono, uppercase, instrument tracking */
+  .t-label {
+    @apply font-mono text-[10px] uppercase leading-none tracking-instrument text-syn-muted;
+  }
+  .t-data {
+    @apply font-mono tabular-nums;
+  }
+  /* Instrument card */
+  .panel {
+    @apply rounded-sm border border-syn-hairline bg-syn-surface;
+  }
+  /* Micro tag */
+  .tag {
+    @apply inline-flex items-center gap-1 rounded-sm border px-1.5 py-[3px] font-mono text-[9px] font-semibold uppercase leading-none tracking-wide;
+  }
+  /* Buttons */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-sm border font-mono text-[11px] font-bold uppercase tracking-instrument transition-colors duration-100 disabled:cursor-not-allowed disabled:opacity-40;
+  }
+  .btn-cyan {
+    @apply btn border-syn-cyan bg-syn-cyan text-syn-canvas hover:bg-[#22d3ee] active:bg-[#0891b2];
+  }
+  .btn-ghost {
+    @apply btn border-syn-frame bg-transparent text-syn-ink hover:border-syn-muted hover:bg-syn-hairline/60;
+  }
+  .btn-red {
+    @apply btn border-syn-red bg-transparent text-syn-red hover:bg-syn-red/10;
+  }
+  .btn-red-fill {
+    @apply btn border-syn-red bg-syn-red text-syn-canvas hover:bg-[#f87171];
+  }
+}
+
+@layer utilities {
+  /* Faint instrument grid for the device backplate */
+  .bg-grid {
+    background-image:
+      linear-gradient(to right, rgba(30, 41, 59, 0.35) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(30, 41, 59, 0.35) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+  /* Diagonal hazard hatch for alert edges */
+  .bg-hatch-amber {
+    background-image: repeating-linear-gradient(
+      -45deg,
+      rgba(245, 158, 11, 0.55) 0 4px,
+      transparent 4px 8px
+    );
+  }
+  .bg-hatch-red {
+    background-image: repeating-linear-gradient(
+      -45deg,
+      rgba(239, 68, 68, 0.55) 0 4px,
+      transparent 4px 8px
+    );
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+}
