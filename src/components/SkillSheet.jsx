@@ -4,6 +4,9 @@ import Footage from './Footage.jsx';
 import { NodeNetwork, ShimmerBorder, SignatureWatermark, TypeBadge, VerifiedCrest, Wireframe } from './ModelVisuals.jsx';
 import { MODEL_TYPES, formatWait, inr } from '../data/catalog.js';
 import { DURATIONS } from '../hooks/useSessionTimer.js';
+import { motion } from '../theme/tokens.js';
+
+const SHEET = motion.sheet;
 
 const TERMS =
   'You get temporary use of the skill during your session. Work you produce while using it is yours, but the skill itself stays with its owner and cannot be resold or recorded.';
@@ -219,7 +222,7 @@ export default function SkillSheet({ model, onClose, onRent }) {
 
   const close = () => {
     setShown(false);
-    setTimeout(onClose, 260);
+    setTimeout(onClose, SHEET.durationMs * 0.75);
   };
 
   useEffect(() => {
@@ -231,16 +234,26 @@ export default function SkillSheet({ model, onClose, onRent }) {
   return (
     <div className="absolute inset-0 z-40">
       <div
-        className={`absolute inset-0 bg-canvas/70 transition-opacity duration-300 ${shown ? 'opacity-100' : 'opacity-0'}`}
+        className={`absolute inset-0 bg-canvas/55 transition-opacity ${shown ? 'opacity-100' : 'opacity-0'}`}
+        style={{
+          backdropFilter: `blur(${SHEET.backdropBlur})`,
+          WebkitBackdropFilter: `blur(${SHEET.backdropBlur})`,
+          transitionDuration: `${SHEET.durationMs}ms`,
+          transitionTimingFunction: SHEET.easing,
+        }}
         onClick={close}
       />
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="sheet-title"
-        className={`absolute inset-x-0 bottom-0 top-3 flex flex-col overflow-hidden rounded-t-2xl border-t border-line bg-canvas transition-transform duration-300 ease-out ${
-          shown ? 'translate-y-0' : 'translate-y-full'
-        }`}
+        className="absolute inset-x-0 bottom-0 top-3 flex flex-col overflow-hidden rounded-t-2xl border-t border-line bg-canvas transition-transform"
+        style={{
+          // Enters from Y-offset +100% (fully below the frame) and settles at 0.
+          transform: shown ? 'translateY(0)' : `translateY(${SHEET.enterY})`,
+          transitionDuration: `${shown ? SHEET.durationMs : SHEET.durationMs * 0.75}ms`,
+          transitionTimingFunction: SHEET.easing,
+        }}
       >
         <div className="flex shrink-0 items-center justify-between px-5 pb-2 pt-3">
           <span className="w-8" />
@@ -269,7 +282,7 @@ export default function SkillSheet({ model, onClose, onRent }) {
                 <TypeBadge label={type.label} className="bg-surface" />
               )}
             </div>
-            <h2 id="sheet-title" className="mt-3 text-display text-ink">
+            <h2 id="sheet-title" className="mt-3 text-screen type-screen text-ink">
               {model.title.replace(/ v\d.*$/, '')}
             </h2>
             <p className="mt-1.5 text-[14px] text-muted">

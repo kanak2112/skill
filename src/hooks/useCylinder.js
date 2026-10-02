@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useReducer, useRef } from 'react';
+import { isSettled, reducedMotion, stepSpring } from '../motion/spring.js';
 
 const AXIS_LOCK_PX = 6;
-const EASE = 0.16;
 
 export const normDeg = (d) => ((((d + 180) % 360) + 360) % 360) - 180;
 export const mod = (n, m) => ((n % m) + m) % m;
@@ -10,41 +10,70 @@ export const mod = (n, m) => ((n % m) + m) % m;
  * Motion + gesture engine for the cylindrical vault.
  *   rot — cylinder rotation in degrees (unbounded, infinite in both directions)
  *   v   — vertical row position (float; integer = row centred, infinite)
- * Horizontal drag rotates, vertical drag/swipe changes domain row. Releases
- * carry momentum and snap to the nearest slot / row.
+ * Horizontal drag rotates, vertical drag/swipe changes skill area. On release the
+ * fling velocity seeds a damped spring (stiffness 300, damping 25) that settles on
+ * the nearest slot / row, so swipes feel weighty rather than instantaneous.
  */
 export function useCylinder({ slots, degPerPx = 0.24, rowPx = 260, onTap }) {
   const step = 360 / slots;
-  const st = useRef({ rot: 0, v: 0, tRot: null, tV: null, drag: null, raf: 0, wheelX: 0, wheelTimer: 0, wheelLock: 0 });
+  const st = useRef({
+    rot: 0,
+    v: 0,
+    rotV: 0, // deg/s
+    vV: 0, // rows/s
+    tRot: null,
+    tV: null,
+    drag: null,
+    raf: 0,
+    last: 0,
+    wheelTimer: 0,
+    wheelLock: 0,
+  });
   const [, render] = useReducer((n) => n + 1, 0);
   const onTapRef = useRef(onTap);
   onTapRef.current = onTap;
 
-  const loop = useCallback(() => {
+  const loop = useCallback((now) => {
     const s = st.current;
+    const dt = s.last ? (now - s.last) / 1000 : 1 / 60;
+    s.last = now;
+    const instant = reducedMotion();
     let moving = false;
+
     if (s.tRot != null) {
-      const d = s.tRot - s.rot;
-      if (Math.abs(d) < 0.05) {
+      const sp = { x: s.rot, v: s.rotV };
+      if (instant) sp.x = s.tRot;
+      else stepSpring(sp, s.tRot, dt);
+      if (instant || isSettled(sp, s.tRot, 0.02)) {
         s.rot = s.tRot;
+        s.rotV = 0;
         s.tRot = null;
       } else {
-        s.rot += d * EASE;
+        s.rot = sp.x;
+        s.rotV = sp.v;
         moving = true;
       }
     }
     if (s.tV != null) {
-      const d = s.tV - s.v;
-      if (Math.abs(d) < 0.002) {
+      const sp = { x: s.v, v: s.vV };
+      if (instant) sp.x = s.tV;
+      else stepSpring(sp, s.tV, dt);
+      if (instant || isSettled(sp, s.tV, 0.001)) {
         s.v = s.tV;
+        s.vV = 0;
         s.tV = null;
       } else {
-        s.v += d * EASE;
+        s.v = sp.x;
+        s.vV = sp.v;
         moving = true;
       }
     }
     render();
-    s.raf = moving ? requestAnimationFrame(loop) : 0;
+    if (moving) s.raf = requestAnimationFrame(loop);
+    else {
+      s.raf = 0;
+      s.last = 0;
+    }
   }, []);
 
   const kick = useCallback(() => {
@@ -53,11 +82,13 @@ export function useCylinder({ slots, degPerPx = 0.24, rowPx = 260, onTap }) {
 
   useEffect(() => () => cancelAnimationFrame(st.current.raf), []);
 
+  /** velocity in deg/ms from the gesture; seeds the spring so a hard flick carries further. */
   const snapRot = useCallback(
     (velocity = 0) => {
       const s = st.current;
-      const projected = s.rot + velocity * 220;
+      const projected = s.rot + velocity * 160;
       s.tRot = Math.round(projected / step) * step;
+      s.rotV = velocity * 1000;
       kick();
     },
     [step, kick],
@@ -70,12 +101,13 @@ export function useCylinder({ slots, degPerPx = 0.24, rowPx = 260, onTap }) {
       let target = Math.round(s.v + velocity * 180);
       target = Math.max(from - 1, Math.min(from + 1, target));
       s.tV = target;
+      s.vV = velocity * 1000;
       kick();
     },
     [kick],
   );
 
-  /** Animate so that (row k, slot i) is centred. */
+  /** Spring so that (row k, slot i) is centred. */
   const focus = useCallback(
     (k, i) => {
       const s = st.current;
@@ -109,8 +141,11 @@ export function useCylinder({ slots, degPerPx = 0.24, rowPx = 260, onTap }) {
   const onPointerDown = useCallback((e) => {
     if (e.button !== 0) return;
     const s = st.current;
+    // Catching the cylinder mid-spin stops it dead, like a finger on a real drum.
     s.tRot = null;
     s.tV = null;
+    s.rotV = 0;
+    s.vV = 0;
     const tile = e.target.closest('[data-slot]');
     s.drag = {
       id: e.pointerId,

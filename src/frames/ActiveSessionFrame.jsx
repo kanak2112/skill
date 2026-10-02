@@ -52,7 +52,7 @@ function StatusBanner({ led, model }) {
         <Icon name={state.icon} size={16} />
         {state.title}
       </p>
-      <p className="mt-2 text-[18px] font-medium leading-snug tracking-[-0.01em] text-ink">{model.title.replace(/ v\d.*$/, '')}</p>
+      <p className="mt-2 text-screen type-screen text-ink">{model.title.replace(/ v\d.*$/, '')}</p>
       <p className="mt-0.5 text-caption text-muted">{source}</p>
     </div>
   );

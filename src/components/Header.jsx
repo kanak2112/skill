@@ -14,7 +14,7 @@ export default function Header({ sessionStatus }) {
   return (
     <header className="flex shrink-0 items-center justify-between gap-3 border-b border-line px-5 py-3">
       <div className="min-w-0">
-        <h1 className="text-app text-ink">Neural Skill Stream</h1>
+        <h1 className="text-screen type-screen text-ink">Neural Skill Stream</h1>
         <p className={`mt-0.5 flex items-center gap-1 text-caption ${meta.tone}`}>
           <Icon name={meta.icon} size={14} />
           {meta.label}

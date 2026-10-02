@@ -5,10 +5,10 @@
 /* CSS-variable mirror of src/theme/tokens.js */
 :root {
   --canvas: #090d14;
-  --surface: #141a24;
+  --surface: #131924;
   --line: #222a38;
   --ink: #f1f5f9;
-  --muted: #94a3b8;
+  --muted: #8e9bae;
   --accent: #e2b168;
   --teal: #5bbfba;
   --amber: #f2a65a;
@@ -24,6 +24,7 @@
   }
   body {
     @apply bg-canvas font-sans text-body text-ink antialiased;
+    /* Body & descriptions: 14px, wght 400, opsz follows size (14 at body size) */
     font-optical-sizing: auto;
     -webkit-tap-highlight-color: transparent;
   }
@@ -40,12 +41,16 @@
   .eyebrow {
     @apply text-section text-muted;
   }
-  /* Precision numerics: tabular figures, condensed width */
+  /* Screen titles: 20px, wght 500, opsz 24 */
+  .type-screen {
+    font-variation-settings: 'opsz' 24;
+  }
+  /* Precision numerics (99.2%, 59:57): opsz 28, wdth 75 condensed, tabular figures */
   .metric {
     @apply text-metric;
     font-feature-settings: 'tnum' 1;
     font-variant-numeric: tabular-nums;
-    font-variation-settings: 'wdth' 75;
+    font-variation-settings: 'opsz' 28, 'wdth' 75;
     font-stretch: 75%;
   }
   /* Full-pill badge */

@@ -1,0 +1,238 @@
+{
+  "color": {
+    "canvas": {
+      "$type": "color",
+      "$value": "#090D14",
+      "$description": "Base background"
+    },
+    "surface": {
+      "$type": "color",
+      "$value": "#131924",
+      "$description": "Card surface"
+    },
+    "line": {
+      "$type": "color",
+      "$value": "#222A38",
+      "$description": "Divider"
+    },
+    "ink": {
+      "$type": "color",
+      "$value": "#F1F5F9",
+      "$description": "Primary text"
+    },
+    "muted": {
+      "$type": "color",
+      "$value": "#8E9BAE",
+      "$description": "Muted label"
+    },
+    "accent": {
+      "$type": "color",
+      "$value": "#E2B168",
+      "$description": "Primary accent (warm brass): primary actions, selected state"
+    },
+    "teal": {
+      "$type": "color",
+      "$value": "#5BBFBA",
+      "$description": "Connection status"
+    },
+    "amber": {
+      "$type": "color",
+      "$value": "#F2A65A",
+      "$description": "Warning"
+    },
+    "alert": {
+      "$type": "color",
+      "$value": "#E06D53",
+      "$description": "Alert / loss (soft coral)"
+    }
+  },
+  "font": {
+    "family": {
+      "$type": "fontFamily",
+      "$value": [
+        "\"Google Sans Flex\"",
+        "ui-sans-serif",
+        "system-ui",
+        "sans-serif"
+      ]
+    }
+  },
+  "typography": {
+    "screen": {
+      "$type": "typography",
+      "$value": {
+        "fontFamily": "Google Sans Flex",
+        "fontSize": "20px",
+        "fontWeight": 500,
+        "lineHeight": "1.2",
+        "letterSpacing": "-0.015em",
+        "fontVariationSettings": {
+          "opsz": 24
+        }
+      }
+    },
+    "section": {
+      "$type": "typography",
+      "$value": {
+        "fontFamily": "Google Sans Flex",
+        "fontSize": "13px",
+        "fontWeight": 500,
+        "lineHeight": "1.3",
+        "letterSpacing": "0"
+      }
+    },
+    "title": {
+      "$type": "typography",
+      "$value": {
+        "fontFamily": "Google Sans Flex",
+        "fontSize": "15px",
+        "fontWeight": 500,
+        "lineHeight": "1.3",
+        "letterSpacing": "-0.01em"
+      }
+    },
+    "body": {
+      "$type": "typography",
+      "$value": {
+        "fontFamily": "Google Sans Flex",
+        "fontSize": "14px",
+        "fontWeight": 400,
+        "lineHeight": "1.55",
+        "letterSpacing": "0",
+        "fontVariationSettings": {
+          "opsz": 14
+        }
+      }
+    },
+    "metric": {
+      "$type": "typography",
+      "$value": {
+        "fontFamily": "Google Sans Flex",
+        "fontSize": "28px",
+        "fontWeight": 400,
+        "lineHeight": "1",
+        "letterSpacing": "0",
+        "fontVariationSettings": {
+          "opsz": 28,
+          "wdth": 75
+        },
+        "fontFeatureSettings": {
+          "tnum": 1
+        }
+      }
+    },
+    "caption": {
+      "$type": "typography",
+      "$value": {
+        "fontFamily": "Google Sans Flex",
+        "fontSize": "12px",
+        "fontWeight": 400,
+        "lineHeight": "1.4",
+        "letterSpacing": "0"
+      }
+    },
+    "tag": {
+      "$type": "typography",
+      "$value": {
+        "fontFamily": "Google Sans Flex",
+        "fontSize": "11px",
+        "fontWeight": 500,
+        "lineHeight": "1",
+        "letterSpacing": "0"
+      }
+    }
+  },
+  "radius": {
+    "container": {
+      "$type": "dimension",
+      "$value": "16px",
+      "$description": "Overlay sheets, modals, device frame"
+    },
+    "control": {
+      "$type": "dimension",
+      "$value": "8px",
+      "$description": "Cards, search bar, primary buttons"
+    },
+    "pill": {
+      "$type": "dimension",
+      "$value": "100px",
+      "$description": "Status indicators, badges (full pill)"
+    }
+  },
+  "motion": {
+    "spring": {
+      "$type": "spring",
+      "$value": {
+        "stiffness": 300,
+        "damping": 25,
+        "mass": 1
+      },
+      "$description": "Carousel rotation, row change, hold ring fill"
+    },
+    "hold": {
+      "duration": {
+        "$type": "duration",
+        "$value": "3000ms"
+      },
+      "release": {
+        "$type": "duration",
+        "$value": "1100ms"
+      }
+    },
+    "sheet": {
+      "duration": {
+        "$type": "duration",
+        "$value": "420ms"
+      },
+      "easing": {
+        "$type": "cubicBezier",
+        "$value": [
+          0.32,
+          0.72,
+          0,
+          1
+        ]
+      },
+      "enterOffsetY": {
+        "$type": "dimension",
+        "$value": "100%"
+      },
+      "backdropBlur": {
+        "$type": "dimension",
+        "$value": "16px"
+      }
+    },
+    "haptics": {
+      "start": {
+        "$type": "vibrationPattern",
+        "$value": [
+          12
+        ],
+        "$description": "navigator.vibrate pattern, ms"
+      },
+      "tick": {
+        "$type": "vibrationPattern",
+        "$value": [
+          18
+        ],
+        "$description": "navigator.vibrate pattern, ms"
+      },
+      "complete": {
+        "$type": "vibrationPattern",
+        "$value": [
+          30,
+          40,
+          70
+        ],
+        "$description": "navigator.vibrate pattern, ms"
+      },
+      "cancel": {
+        "$type": "vibrationPattern",
+        "$value": [
+          8
+        ],
+        "$description": "navigator.vibrate pattern, ms"
+      }
+    }
+  }
+}

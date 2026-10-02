@@ -13,6 +13,12 @@ npm run dev      # http://localhost:5173
 npm run build
 ```
 
+## Design system
+
+Tokens, type roles, radius scale and motion specs (springs, hold-to-stop timeline, sheet
+transition, haptics) are documented in [`DESIGN_SYSTEM.md`](DESIGN_SYSTEM.md). `npm run tokens`
+exports `src/theme/tokens.js` to `tokens/design-tokens.json` for Figma Variables.
+
 ## Artefacts
 
 **01 · Cylindrical skill vault** (`src/frames/MarketplaceFrame.jsx`)
