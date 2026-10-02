@@ -1,7 +1,7 @@
-# SYNAPTEK // BCI Skill Streaming Node
+# Neural Skill Stream
 
-Interactive 3-frame prototype for a 2035 Brain-Computer Interface skill-rental terminal.
-Built with React (Vite), Tailwind CSS and lucide-react.
+Interactive 3-frame prototype for a BCI skill-rental app. React (Vite), Tailwind CSS, lucide-react,
+set entirely in Google Sans Flex.
 
 ```bash
 npm install
@@ -13,20 +13,21 @@ npm run build
 
 | Path | Purpose |
 | --- | --- |
-| `src/theme/tokens.js` | Design tokens (colors, fonts, tracking) — consumed by `tailwind.config.js` as `syn-*` utilities |
-| `src/index.css` | CSS-variable mirror of tokens + component classes (`.t-label`, `.panel`, `.tag`, `.btn-*`) |
-| `src/components/Header.jsx` | Status bar (live clock from 09:41:00 IST), brand badge, node pill |
-| `src/components/FrameTabs.jsx` | Frame 01/02/03 selector |
-| `src/components/ui.jsx` | StatusDot, Tag, SectionLabel, AlertBox, CornerMarks |
-| `src/frames/MarketplaceFrame.jsx` | Frame 01 — search, tier filter, featured + composite models, CDSCO notice |
-| `src/frames/ActiveSessionFrame.jsx` | Frame 02 — live countdown, telemetry, drift warning, emergency decoherence modal |
-| `src/frames/DiagnosticFrame.jsx` | Frame 03 — KPIs, decay log, JSON telemetry export |
-| `src/hooks/useSessionTimer.js` | Session lifecycle (`active` / `terminated` / `complete`), kept in `App` so the countdown survives tab switches |
+| `src/theme/tokens.js` | Color and font tokens, consumed by `tailwind.config.js` (`bg-canvas`, `bg-surface`, `border-line`, `text-muted`, `bg-accent`, …) |
+| `src/index.css` | CSS-variable mirror of the tokens + `.card` and `.btn-*` component classes |
+| `src/components/Header.jsx` | Status row (time, connection, patch battery), app title, patch status |
+| `src/components/FrameTabs.jsx` | Prototype-only frame switcher, outside the device |
+| `src/frames/MarketplaceFrame.jsx` | Frame 01 — search, category pills, primary skill card, secondary listing |
+| `src/frames/ActiveSessionFrame.jsx` | Frame 02 — live countdown, vitals, residual notice, stop confirmation sheet |
+| `src/frames/DiagnosticFrame.jsx` | Frame 03 — comparative metrics, side effects list, export |
+| `src/hooks/useSessionTimer.js` | Session lifecycle, kept in `App` so the countdown survives frame switches |
+
+Tabular figures (`tabular-nums`) are applied only to percentages, times and prices.
 
 ## Interactions
 
-- Search and tier tabs filter the asset index (Synthetic shows an empty state).
-- Duration selector (15M / 1H / 4H) reprices the CTA; renting starts a fresh session and opens Frame 02.
-- Frame 02 boots mid-stream at 42:19 of a 1H session (bar = time remaining, ~70%).
-- Emergency Decoherence opens a confirm dialog (Esc / Cancel / Stop Now); stopping halts the stream and links to the report.
-- Export Telemetry downloads the session report as JSON.
+- Search and category pills filter listings; the duration picker reprices the CTA.
+- Renting (either listing) starts a session and opens Frame 02.
+- Frame 02 boots at 42:19 remaining of a 1h session and counts down.
+- Stop Session → Confirm Disconnect? sheet (Esc / Cancel / Disconnect Now) → View Diagnostic.
+- Export Data downloads the report as JSON; Done returns to the marketplace.

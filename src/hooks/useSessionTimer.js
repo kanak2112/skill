@@ -1,16 +1,16 @@
 import { useCallback, useEffect, useState } from 'react';
 
 export const DURATIONS = {
-  '15M': { label: '15M', seconds: 15 * 60, multiplier: 0.25, display: '0H 15M' },
-  '1H': { label: '1H', seconds: 60 * 60, multiplier: 1, display: '1H 00M' },
-  '4H': { label: '4H', seconds: 4 * 60 * 60, multiplier: 4, display: '4H 00M' },
+  '15m': { label: '15m', seconds: 15 * 60, multiplier: 0.25 },
+  '1h': { label: '1h', seconds: 60 * 60, multiplier: 1 },
+  '4h': { label: '4h', seconds: 4 * 60 * 60, multiplier: 4 },
 };
 
-// Demo boot state: a 1H stream already in progress with 42:19 remaining.
+// Demo boot state: a 1h stream already in progress with 42:19 remaining.
 export const DEFAULT_PROFILE = 'Chef Arjun Mehra — Knife Prep';
 
 const DEMO_SESSION = {
-  durationKey: '1H',
+  durationKey: '1h',
   total: 3600,
   remaining: 42 * 60 + 19,
   status: 'active',

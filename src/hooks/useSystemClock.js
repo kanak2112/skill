@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 
-// Simulated terminal clock. Boots at 09:41:00 IST and ticks forward in real
-// time so the prototype always opens on the canonical status-bar reading.
+// Simulated device clock. Boots at 09:41 and ticks forward in real time so the
+// prototype always opens on the same status-bar reading.
 const BOOT_SECONDS = 9 * 3600 + 41 * 60;
 
 export function useSystemClock() {
@@ -14,6 +14,5 @@ export function useSystemClock() {
 
   const hh = String(Math.floor(seconds / 3600)).padStart(2, '0');
   const mm = String(Math.floor((seconds % 3600) / 60)).padStart(2, '0');
-  const ss = String(seconds % 60).padStart(2, '0');
-  return `${hh}:${mm}:${ss}`;
+  return `${hh}:${mm}`;
 }
