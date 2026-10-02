@@ -46,7 +46,7 @@ export default function App() {
           ref={scrollRef}
           className={`no-scrollbar min-h-0 flex-1 ${frame === 'market' ? 'overflow-hidden' : 'overflow-y-auto'}`}
         >
-          {frame === 'market' && <MarketplaceFrame onOpen={setSheetModel} />}
+          {frame === 'market' && <MarketplaceFrame onOpen={setSheetModel} onRent={handleRent} />}
           {frame === 'session' && (
             <ActiveSessionFrame
               session={session}
@@ -73,7 +73,7 @@ export default function App() {
             <Activity className="h-3.5 w-3.5" /> Simulate anomaly
           </button>
         ) : frame === 'market' ? (
-          <span>Drag to rotate · swipe vertically for domains · tap a tile to focus</span>
+          <span>Drag sideways to browse · swipe up or down to change area · tap a card for details</span>
         ) : null}
       </div>
     </div>

@@ -3,11 +3,13 @@ import Footage from './Footage.jsx';
 import { NodeNetwork, NoOwnerTag, ShimmerBorder, SignatureWatermark, TypeBadge, VerifiedCrest, Wireframe } from './ModelVisuals.jsx';
 import { MODEL_TYPES, inr } from '../data/catalog.js';
 
-function TileBody({ model, offset }) {
+function TileBody({ model, offset, speed }) {
   const type = MODEL_TYPES[model.type];
   return (
     <div className="relative h-full overflow-hidden rounded-[11px] bg-surface">
-      <Footage scene={model.scene} variant={model.variant} src={model.video} offset={offset} className="absolute inset-0" />
+      <div className="absolute inset-0 animate-drift">
+        <Footage scene={model.scene} variant={model.variant} src={model.video} offset={offset} speed={speed} className="h-full w-full" />
+      </div>
 
       {model.type === 'composite' && <NodeNetwork className="absolute inset-0 h-full w-full" />}
       {model.type === 'synthetic' && <Wireframe className="absolute inset-0 h-full w-full" />}
@@ -24,7 +26,7 @@ function TileBody({ model, offset }) {
         {model.type === 'personal' && <SignatureWatermark name={model.expert} className="mb-1" />}
         <p className="line-clamp-2 text-[12.5px] font-semibold leading-tight text-ink">{model.title}</p>
         <p className="mt-1 text-[11px] text-muted">
-          <span className="tabular-nums">{inr(model.hourly)}</span>/hr · <span className="tabular-nums">{model.match}%</span>
+          <span className="tabular-nums">{inr(model.hourly)}</span>/hr · <span className="tabular-nums">{Math.round(model.match)}%</span> fit
         </p>
       </div>
     </div>
@@ -32,14 +34,14 @@ function TileBody({ model, offset }) {
 }
 
 /** One video tile in the cylinder. Visual treatment varies by model provenance. */
-function VaultTile({ model, offset = 0 }) {
+function VaultTile({ model, offset = 0, speed = 1 }) {
   if (model.type === 'composite') {
     return (
       <div className="relative h-full">
         <div className="absolute inset-0 -translate-y-[12px] scale-[0.86] rounded-xl border border-line bg-surface/60" aria-hidden="true" />
         <div className="absolute inset-0 -translate-y-[6px] scale-[0.93] rounded-xl border border-line bg-surface/80" aria-hidden="true" />
         <div className="relative h-full rounded-xl border border-accent/40 p-0">
-          <TileBody model={model} offset={offset} />
+          <TileBody model={model} offset={offset} speed={speed} />
         </div>
       </div>
     );
@@ -47,13 +49,13 @@ function VaultTile({ model, offset = 0 }) {
   if (model.type === 'synthetic') {
     return (
       <ShimmerBorder className="h-full">
-        <TileBody model={model} offset={offset} />
+        <TileBody model={model} offset={offset} speed={speed} />
       </ShimmerBorder>
     );
   }
   return (
     <div className="h-full rounded-xl border border-cyan/40">
-      <TileBody model={model} offset={offset} />
+      <TileBody model={model} offset={offset} speed={speed} />
     </div>
   );
 }

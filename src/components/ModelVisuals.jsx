@@ -19,14 +19,14 @@ export function TypeBadge({ type, label, size = 'sm' }) {
 
 export function VerifiedCrest({ className = 'h-5 w-5' }) {
   return (
-    <BadgeCheck className={`${className} fill-gold text-canvas`} strokeWidth={2} aria-label="Verified creator" role="img" />
+    <BadgeCheck className={`${className} fill-gold text-canvas`} strokeWidth={2} aria-label="Verified expert" role="img" />
   );
 }
 
 export function NoOwnerTag() {
   return (
     <span className="inline-flex items-center rounded-md bg-canvas/70 px-1.5 py-0.5 text-[9px] font-medium text-ink ring-1 ring-ink/25 backdrop-blur-sm">
-      No single human owner
+      No human owner
     </span>
   );
 }

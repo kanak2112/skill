@@ -6,18 +6,21 @@ import { subscribe } from '../footage/ticker.js';
  * Looped, muted "first-person footage". Plays a real clip when `src` is given,
  * otherwise renders the model's procedural scene on a canvas.
  */
-function Footage({ scene, variant = 0, src, paused = false, offset = 0, className = '' }) {
+function Footage({ scene, variant = 0, src, paused = false, speed = 1, offset = 0, className = '' }) {
   const canvasRef = useRef(null);
   const videoRef = useRef(null);
   const pausedRef = useRef(paused);
   pausedRef.current = paused;
+  const speedRef = useRef(speed);
+  speedRef.current = speed;
 
   useEffect(() => {
     const v = videoRef.current;
     if (!v) return;
+    v.playbackRate = speed;
     if (paused) v.pause();
     else v.play().catch(() => {});
-  }, [paused]);
+  }, [paused, speed]);
 
   useEffect(() => {
     if (src) return undefined;
@@ -40,7 +43,7 @@ function Footage({ scene, variant = 0, src, paused = false, offset = 0, classNam
     ro.observe(canvas);
 
     const unsubscribe = subscribe((dt) => {
-      if (!pausedRef.current) t += dt;
+      if (!pausedRef.current) t += dt * speedRef.current;
       if (!w || !h) return;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, w, h);

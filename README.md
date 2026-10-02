@@ -15,26 +15,30 @@ npm run build
 - CSS-3D inner-cylinder carousel: 8 tiles per ring, tiles tilt ±15° as they curve away.
 - Horizontal drag rotates 360° (infinite, with momentum + snap). Vertical swipe moves between
   domains — Culinary, Craft, Physical, Cognitive (infinite). Trackpad/wheel and arrow keys also work.
-- Provenance filter (All / Personal / Composite / Synthetic) dims non-matching tiles and rotates to
-  the nearest match.
+- Search bar ("Search skills, tasks, or experts...") with simulated voice input and suggestion tags;
+  results dim non-matches and bring the nearest match forward, across skill areas.
+- Filter (All / Human experts / Combined / AI generated) works the same way.
+- Depth: side cards recede, scale to 82%, fade and blur slightly; they keep playing at a slower speed.
 - Tile treatments: **Personal** — cyan badge, gold verified crest, expert signature watermark.
   **Composite** — stacked layers + node-network overlay. **Synthetic** — rotating wireframe shimmer
   border, wireframe grid, "No single human owner" tag.
-- Tap any tile to lock it to centre and open the full-height skill sheet (`SkillSheet.jsx`):
-  preview controls, provenance copy, rating/rentals/queue, live EEG/EMG compatibility, expert or
-  model verification + CDSCO licence, hourly and per-minute pricing, max continuous rental per 24h
-  rest window (longer durations disabled), refund terms, disclosure accordions, and a waiting-list
-  simulation before "Rent & stream now".
+- Tap any tile to lock it to centre and open the skill sheet (`SkillSheet.jsx`): preview, verified
+  badge, three key numbers (rating, fit, price), plain-English after-effects, and a collapsed
+  "More details" section (expert, fit breakdown, pricing and daily limit, refunds, terms, safety).
+  Waiting-list models show a pulsing queue card that counts down before "Rent for ₹…".
 
 **02 · Neural & haptic wearable** (`src/frames/ActiveSessionFrame.jsx`)
 - Live motor-profile banner, countdown, motor frequency and skin-contact impedance readings.
 - Anomaly detector (`useAnomaly.js`): fires ~8 s into a stream and every 35 s, or on demand via
   "Simulate anomaly" under the device; auto-stabilises over 6 s.
-- Patch illustration (`Wearable.jsx`) with segmented LED ring — cyan active, amber drift, red
-  decoherence — and a touch kill-switch: press and hold 1.5 s. "Stop Session" uses a confirm sheet.
+- Movement signal and skin contact readings jitter live with sparklines.
+- Patch illustration (`Wearable.jsx`) with segmented LED ring — cyan active, amber warning, red
+  disconnected — and a stop button: hold for a 3-2-1 countdown, then the ring drains before the
+  skill disconnects. "Stop skill" uses a confirm sheet.
 
 **03 · Post-rental diagnostic** (`src/frames/DiagnosticFrame.jsx`)
-- Performance vs. retention split, residual artifacts, unassisted competency regression, JSON export.
+- How well you did vs. what you kept, after-effects, and natural skill loss with the lost 14% drawn
+  on the bar. JSON export (works locally; the hosted artifact viewer blocks downloads).
 
 ## Footage
 
