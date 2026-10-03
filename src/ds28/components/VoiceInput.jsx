@@ -2,10 +2,11 @@ import { useEffect, useRef, useState } from 'react';
 import { parsePrompt, presetShape } from '../shapes.js';
 
 const EXAMPLES = [
-  'Sculpt a sharp crimson anger symbol with glossy metallic bevels',
-  'A matte gold lightning bolt for the forearm',
-  'Cyan teardrop with satin pearl coating',
+  'A glossy crimson anger glyph',
+  'Cyber cyan lightning bolt',
+  'Matte gold teardrop with satin pearl coating',
   'Stealth slate hexagon, brushed and flat',
+  'Sculpt a sharp crimson anger symbol with glossy metallic bevels',
 ];
 
 const LOG = ['Parsing intent tokens', 'Resolving form primitive', 'Lofting bevel geometry', 'Baking coating map'];
@@ -106,7 +107,7 @@ export default function VoiceInput({ design, onChange }) {
       </div>
 
       <div className="chips">
-        {EXAMPLES.slice(1).map((ex) => (
+        {EXAMPLES.map((ex) => (
           <button key={ex} className="chip chip-btn" onClick={() => setText(ex)}>{ex}</button>
         ))}
       </div>

@@ -13,29 +13,39 @@ npm run dev      # http://localhost:5173
 npm run build
 ```
 
-## Neural Stream™ DS-28 storefront & Web Manual (`/ds28/`)
+## Neural Stream™ DS-28 (`/ds28/`)
 
 A second page in the same Vite project (`ds28/index.html` → `src/ds28/`). Open
-http://localhost:5173/ds28/ with `npm run dev`. Plain CSS (`src/ds28/ds28.css`), React state only, no backend.
+http://localhost:5173/ds28/ with `npm run dev`. React, plain CSS (`src/ds28/ds28.css`) and Lucide icons;
+no backend. `npm test` runs the Vitest suite for pricing, persona, prompt-parsing and tracing logic.
 
-**Storefront**
-- **Overview**: "Wear Your Motor Intent." hero, feature cards, skill stream preview.
-- **Shape Studio** (`pages/Studio.jsx`): three generation inputs.
-  - *Voice Prompt*: Web Speech API where available, simulated dictation otherwise. `parsePrompt()` in
-    `shapes.js` maps keywords to form, finish and coating (e.g. "crimson anger … glossy" → Anger Glyph,
-    Electro-Chromic Red, Glossy metallic).
-  - *Sketch Canvas*: freehand strokes are normalised and smoothed into a wire-form shell; nine vector primitives.
-  - *Image Reference*: uploads are traced to a 40 × 40 silhouette and snapped to the nearest finish colour.
-  - Four finishes (#ff2a4b, #00f0ff, #ffb703, #334155) × three coatings, rendered with an SVG specular bevel.
-  - Try-on silhouette with Temple (0.82 kΩ), Cervical (1.14 kΩ) and Forearm (0.45 kΩ) nodes; the patch
-    moves, scales and rotates to the selected node, with an optional close-up.
-- **Cart & Sync**: $280 core + $60 shell = $340. *Confirm Order* issues a serial such as `DS28-ANG-301`
-  and stores the profile (localStorage, when available), which unlocks the Web Manual.
+**Mode 1 · Landing** (`pages/Landing.jsx`, `components/Head3D.jsx`): a procedural wireframe head on
+canvas (deformed sphere with brow, eye sockets, nose, lips, chin, ears and a neck, lit per vertex)
+rotates continuously and can be dragged. The temple patch is a DOM overlay turned with CSS 3D
+transforms to match the surface normal; it morphs (Anger Glyph → Volt Bolt → Teardrop → Hex Mesh, each
+with its own colour) while hidden behind the head on every turn. "GET YOURS NOW" plays a zoom and
+wipe into the purchase flow.
 
-**Web Manual** (`manual/`), themed from the shell finish via `--acc`:
-01 shell configurator (Active Load Glow / Stealth Mode) · 02 hold-to-calibrate ring · 03 stream rental
-(price and cooldown = hours × override × 1.5, min 1 h; locked until calibrated) · 04 live topology
-inspector with bond-site re-assignment · 05 safety disclaimers and the DRM lockout overlay.
+**Mode 2 · Purchase flow** (three steps in the top bar)
+1. **Persona & skills** (`pages/Profiler.jsx`, `persona.js`): the user types a handle or short bio;
+   an on-device keyword profiler (no network) returns a primary / secondary archetype and six trait
+   scores. The marketplace offers each skill as a rental ($/hr, 1–8 prepaid hours) or monthly
+   subscription (Craftsman $48 / $199, Surgeon $120 / $499, Heavy $250 / $899). The evolution
+   preview tweens a radar chart from baseline to boosted traits and names the new persona.
+2. **Shape Studio**: voice prompt (quick tags such as "A glossy crimson anger glyph"), sketch canvas
+   and image trace; four finishes × three coatings; try-on on the Temple, Cervical and Forearm nodes.
+3. **Checkout**: Core Unit $280 + Bespoke Shell $60 + skill plan. "Confirm & Bond Shell" issues an ID
+   such as `DS28-ANG-241` and unlocks the Web Manual.
+
+**Mode 3 · Web Manual** (`manual/`), themed from the bonded finish via `--acc`: 01 glow / stealth
+shell profile · 02 hold-to-calibrate ring · 03 rental / subscription switcher, 1–8 h session, live
+pricing (subscription hours count against a 40 h monthly cap), and live stream and cooldown timers on
+a demo clock (1× / 60× / 600×) that lock re-streaming until cleared · 04 topology inspector with
+impedance, 28-channel electrode seating map, SNR and latency per node · 05 safety disclaimers and the
+signal caching violation interlock.
+
+Persona, plan, design and the order (with console settings) are saved to localStorage when it is
+available.
 
 ## Design system
 

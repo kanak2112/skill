@@ -1,17 +1,19 @@
-import { useEffect, useState } from 'react';
-import Overview from './pages/Overview.jsx';
+import { useCallback, useEffect, useState } from 'react';
+import { Lock, Unlock } from 'lucide-react';
+import Landing from './pages/Landing.jsx';
+import Profiler from './pages/Profiler.jsx';
 import Studio from './pages/Studio.jsx';
 import Checkout from './pages/Checkout.jsx';
 import Manual from './manual/Manual.jsx';
 import Logo from './components/Logo.jsx';
 import { presetShape } from './shapes.js';
 
-const STORE_KEY = 'ds28.order';
+const STORE_KEY = 'ds28.session.v2';
 
-const NAV = [
-  { id: 'overview', label: 'Overview' },
+const STEPS = [
+  { id: 'profile', label: 'Persona & skills' },
   { id: 'studio', label: 'Shape Studio' },
-  { id: 'cart', label: 'Cart & Sync' },
+  { id: 'checkout', label: 'Checkout' },
 ];
 
 export const DEFAULT_DESIGN = {
@@ -19,81 +21,108 @@ export const DEFAULT_DESIGN = {
   finishId: 'red',
   coating: 'gloss',
   nodeId: 'temple',
-  prompt: 'Sculpt a sharp crimson anger symbol with glossy metallic bevels',
+  prompt: 'A glossy crimson anger glyph',
 };
+export const DEFAULT_PLAN = { skillId: 'craftsman', billing: 'monthly', hours: 2 };
 
-function loadOrder() {
+function load() {
   try {
-    const raw = localStorage.getItem(STORE_KEY);
-    return raw ? JSON.parse(raw) : null;
+    return JSON.parse(localStorage.getItem(STORE_KEY)) ?? {};
   } catch {
-    return null;
+    return {};
   }
 }
 
+/**
+ * Global state: persona, plan and design flow from the storefront into the order, and the
+ * order (serial, shell, finish, plan) themes and drives the Web Manual.
+ */
 export default function App() {
-  const [page, setPage] = useState('overview');
-  const [design, setDesign] = useState(DEFAULT_DESIGN);
-  const [order, setOrder] = useState(loadOrder);
+  const saved = load();
+  const [mode, setMode] = useState('landing');
+  const [step, setStep] = useState('profile');
+  const [persona, setPersona] = useState(saved.persona ?? null);
+  const [plan, setPlan] = useState(saved.plan ?? DEFAULT_PLAN);
+  const [design, setDesign] = useState(saved.design ?? DEFAULT_DESIGN);
+  const [order, setOrder] = useState(saved.order ?? null);
 
   useEffect(() => {
     try {
-      if (order) localStorage.setItem(STORE_KEY, JSON.stringify(order));
-      else localStorage.removeItem(STORE_KEY);
+      localStorage.setItem(STORE_KEY, JSON.stringify({ persona, plan, design, order }));
     } catch {
-      /* storage unavailable: the order simply lives for this visit */
+      /* storage blocked: state lives for this visit only */
     }
-  }, [order]);
+  }, [persona, plan, design, order]);
 
   useEffect(() => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, [page]);
+    window.scrollTo({ top: 0 });
+  }, [mode, step]);
 
-  const updateDesign = (patch) => setDesign((d) => ({ ...d, ...patch }));
-  const updateOrderDesign = (patch) => setOrder((o) => (o ? { ...o, design: { ...o.design, ...patch } } : o));
+  const updatePlan = useCallback((patch) => setPlan((p) => ({ ...p, ...patch })), []);
+  const updateDesign = useCallback((patch) => setDesign((d) => ({ ...d, ...patch })), []);
+  const updateOrder = useCallback((patch) => setOrder((o) => (o ? { ...o, ...patch } : o)), []);
+  const go = (s) => {
+    setMode('flow');
+    setStep(s);
+  };
+
+  if (mode === 'landing') {
+    return <Landing onEnter={() => go('profile')} hasOrder={!!order} onManual={() => setMode('manual')} />;
+  }
+
+  const stepIndex = STEPS.findIndex((s) => s.id === step);
 
   return (
-    <div className={`app ${page === 'manual' ? 'is-manual' : ''}`}>
+    <div className="app flow-enter">
       <header className="topbar">
-        <button className="brand" onClick={() => setPage('overview')} aria-label="Neural Stream DS-28 home">
+        <button className="brand" onClick={() => setMode('landing')} aria-label="Back to the Neural Stream DS-28 showcase">
           <Logo />
-          <span>
-            Neural Stream<sup>™</sup> <b>DS-28</b>
-          </span>
+          <span>Neural Stream<sup>™</sup> <b>DS-28</b></span>
         </button>
-        <nav className="nav" aria-label="Primary">
-          {NAV.map((n) => (
-            <button key={n.id} className={`nav-link ${page === n.id ? 'active' : ''}`} onClick={() => setPage(n.id)}>
-              {n.label}
-              {n.id === 'cart' && <span className="nav-badge">1</span>}
+        <nav className="nav" aria-label="Purchase steps">
+          {STEPS.map((s, i) => (
+            <button
+              key={s.id}
+              className={`nav-link step ${mode === 'flow' && step === s.id ? 'active' : ''} ${mode === 'flow' && i < stepIndex ? 'done' : ''}`}
+              onClick={() => go(s.id)}
+              aria-current={mode === 'flow' && step === s.id ? 'step' : undefined}
+            >
+              <span className="step-n mono">{i + 1}</span>
+              {s.label}
             </button>
           ))}
           <button
-            className={`nav-link manual-link ${page === 'manual' ? 'active' : ''}`}
-            onClick={() => setPage('manual')}
+            className={`nav-link manual-link ${mode === 'manual' ? 'active' : ''}`}
+            onClick={() => setMode('manual')}
             disabled={!order}
-            title={order ? `Web Manual for ${order.serial}` : 'Confirm an order to unlock the Web Manual'}
+            title={order ? `Web Manual for ${order.serial}` : 'Confirm & bond a shell to unlock the Web Manual'}
           >
-            <span className={`dot ${order ? 'on' : ''}`} />
+            {order ? <Unlock size={14} aria-hidden="true" /> : <Lock size={14} aria-hidden="true" />}
             Web Manual
           </button>
         </nav>
       </header>
 
-      <main key={page} className="page-enter">
-        {page === 'overview' && <Overview onStudio={() => setPage('studio')} />}
-        {page === 'studio' && <Studio design={design} onChange={updateDesign} onCart={() => setPage('cart')} />}
-        {page === 'cart' && (
+      <main key={`${mode}-${step}`} className="page-enter">
+        {mode === 'flow' && step === 'profile' && (
+          <Profiler persona={persona} onPersona={setPersona} plan={plan} onPlan={updatePlan} onNext={() => go('studio')} />
+        )}
+        {mode === 'flow' && step === 'studio' && (
+          <Studio design={design} onChange={updateDesign} onCart={() => go('checkout')} />
+        )}
+        {mode === 'flow' && step === 'checkout' && (
           <Checkout
             design={design}
+            plan={plan}
+            persona={persona}
             order={order}
-            onEdit={() => setPage('studio')}
+            onEdit={go}
             onConfirm={setOrder}
-            onManual={() => setPage('manual')}
+            onManual={() => setMode('manual')}
           />
         )}
-        {page === 'manual' && order && (
-          <Manual order={order} onDesign={updateOrderDesign} onReset={() => { setOrder(null); setPage('studio'); }} />
+        {mode === 'manual' && order && (
+          <Manual order={order} onOrder={updateOrder} onNewShell={() => go('studio')} />
         )}
       </main>
 

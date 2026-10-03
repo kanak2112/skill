@@ -21,7 +21,7 @@ export default function Studio({ design, onChange, onCart }) {
   return (
     <div className="studio">
       <header className="section-head page-head">
-        <p className="eyebrow mono">02 / Shape Studio</p>
+        <p className="eyebrow mono">Step 2 of 3 · Shape Studio</p>
         <h1>Sculpt your shell</h1>
         <p className="muted">Three ways in. Every change re-renders the shell and the try-on preview in real time.</p>
       </header>
@@ -153,7 +153,7 @@ export default function Studio({ design, onChange, onCart }) {
               <p className="mono small muted">CORE + BESPOKE SHELL</p>
               <p className="studio-total mono">{usd(PRICING.core + PRICING.shell)}</p>
             </div>
-            <button className="btn btn-primary" onClick={onCart}>Continue to Cart & Sync →</button>
+            <button className="btn btn-primary" onClick={onCart}>Continue to checkout →</button>
           </div>
         </div>
       </div>

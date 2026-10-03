@@ -66,23 +66,51 @@ export const SKILLS = [
     name: 'Master Craftsman',
     override: 75,
     rate: 48,
+    monthly: 199,
+    evolves: 'Master Artisan',
+    evolvesNote: 'sub-millimetre precision',
     blurb: 'Joinery, carving and fine hand-tool control. Shared agency: you steer, the stream steadies.',
+    boost: { precision: 34, creativity: 16, composure: 10, focus: 8 },
   },
   {
     id: 'surgeon',
     name: 'Virtuoso Surgeon',
     override: 90,
     rate: 120,
+    monthly: 499,
+    evolves: 'Bio-Mechanical Virtuoso',
+    evolvesNote: 'suppressed tremor noise',
     blurb: 'Sub-millimetre suturing and instrument tremor suppression. Licensed theatres only.',
+    boost: { precision: 44, composure: 34, focus: 22 },
   },
   {
     id: 'heavy',
     name: 'Autonomous Heavy',
     override: 98,
     rate: 250,
+    monthly: 899,
+    evolves: 'High-Load Industrial Operative',
+    evolvesNote: 'full-body load control',
     blurb: 'Full-body load handling and rigging. Near-total motor override; you ride along.',
+    boost: { strength: 52, endurance: 42, composure: 6, precision: 10 },
   },
 ];
+
+/** Hours a monthly subscription includes before the fair-use cap. */
+export const MONTHLY_HOURS = 40;
+
+/** Price of a plan as billed at checkout: prepaid hours for rentals, first month for subscriptions. */
+export function planPrice(plan) {
+  const skill = findSkill(plan.skillId);
+  return plan.billing === 'monthly' ? skill.monthly : skill.rate * plan.hours;
+}
+
+export function planLabel(plan) {
+  const skill = findSkill(plan.skillId);
+  return plan.billing === 'monthly'
+    ? `${skill.name} · Monthly subscription`
+    : `${skill.name} · ${plan.hours} h rental`;
+}
 
 export const PRICING = { core: 280, shell: 60 };
 
