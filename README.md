@@ -13,6 +13,30 @@ npm run dev      # http://localhost:5173
 npm run build
 ```
 
+## Neural Stream™ DS-28 storefront & Web Manual (`/ds28/`)
+
+A second page in the same Vite project (`ds28/index.html` → `src/ds28/`). Open
+http://localhost:5173/ds28/ with `npm run dev`. Plain CSS (`src/ds28/ds28.css`), React state only, no backend.
+
+**Storefront**
+- **Overview**: "Wear Your Motor Intent." hero, feature cards, skill stream preview.
+- **Shape Studio** (`pages/Studio.jsx`): three generation inputs.
+  - *Voice Prompt*: Web Speech API where available, simulated dictation otherwise. `parsePrompt()` in
+    `shapes.js` maps keywords to form, finish and coating (e.g. "crimson anger … glossy" → Anger Glyph,
+    Electro-Chromic Red, Glossy metallic).
+  - *Sketch Canvas*: freehand strokes are normalised and smoothed into a wire-form shell; nine vector primitives.
+  - *Image Reference*: uploads are traced to a 40 × 40 silhouette and snapped to the nearest finish colour.
+  - Four finishes (#ff2a4b, #00f0ff, #ffb703, #334155) × three coatings, rendered with an SVG specular bevel.
+  - Try-on silhouette with Temple (0.82 kΩ), Cervical (1.14 kΩ) and Forearm (0.45 kΩ) nodes; the patch
+    moves, scales and rotates to the selected node, with an optional close-up.
+- **Cart & Sync**: $280 core + $60 shell = $340. *Confirm Order* issues a serial such as `DS28-ANG-301`
+  and stores the profile (localStorage, when available), which unlocks the Web Manual.
+
+**Web Manual** (`manual/`), themed from the shell finish via `--acc`:
+01 shell configurator (Active Load Glow / Stealth Mode) · 02 hold-to-calibrate ring · 03 stream rental
+(price and cooldown = hours × override × 1.5, min 1 h; locked until calibrated) · 04 live topology
+inspector with bond-site re-assignment · 05 safety disclaimers and the DRM lockout overlay.
+
 ## Design system
 
 Tokens, type roles, radius scale and motion specs (springs, hold-to-stop timeline, sheet
