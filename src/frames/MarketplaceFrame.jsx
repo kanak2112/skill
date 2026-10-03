@@ -139,7 +139,11 @@ function DomainRail({ centerRow, onJump }) {
   );
 }
 
-export default function MarketplaceFrame({ onOpen }) {
+/**
+ * `selectedIds` (optional) marks chosen tiles with a tick; `hint` replaces the browse hint.
+ * Both default to the original rental behaviour.
+ */
+export default function MarketplaceFrame({ onOpen, selectedIds = [], hint = 'Drag to browse · tap a card to rent' }) {
   const stageRef = useRef(null);
   const [size, setSize] = useState({ w: 390, h: 440 });
   const [filter, setFilter] = useState('all');
@@ -280,6 +284,11 @@ export default function MarketplaceFrame({ onOpen }) {
           }}
         >
           <VaultTile model={m} offset={i * 0.37 + mod(k, DOMAINS.length) * 1.3} speed={side < 0.4 && Math.abs(dk) < 0.5 ? 1 : 0.4} focus={focus} />
+          {selectedIds.includes(m.id) && (
+            <span className="absolute right-2 top-9 flex h-7 w-7 items-center justify-center rounded-full bg-accent text-[#0F172A] shadow-lg" aria-label="Added">
+              <Icon name="check" size={18} />
+            </span>
+          )}
         </div>,
       );
     }
@@ -310,7 +319,7 @@ export default function MarketplaceFrame({ onOpen }) {
 
       <div className="flex shrink-0 items-baseline justify-between px-5 pb-1 pt-3">
         <h2 className="eyebrow">{domain.label}</h2>
-        <span className="text-caption text-muted">Drag to browse · tap a card to rent</span>
+        <span className="text-caption text-muted">{hint}</span>
       </div>
 
       <div

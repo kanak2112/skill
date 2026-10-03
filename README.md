@@ -114,12 +114,16 @@ UMD + in-browser Babel and Lucide setup). Open it directly in a browser.
   Choosing temple, neck or forearm moves the camera to frame that spot; forearm zooms out to a raised
   stand-in forearm model with the shell on its inner side.
 - **Checkout:** Indian delivery address and shipping speed in ₹.
-- **Web Manual:** before delivery only Order Tracking, Where to Wear It and Safety are open.
-  Once delivered, Onboarding (pair, then calibrate), Skill Rental and Hardware open. Skill Rental
-  shows a motor profile from the buyer's online check (2035 phone-based test), replaced by the
-  patch's own reading after calibration; goals, sessions a week and budget drive a personalised plan
-  (skill class, four-week build-up, pay per hour vs monthly) with every rule shown. Starting a
-  session needs a paired, calibrated patch. Prototype controls can mark the order delivered.
+- **Web Manual, before delivery:** only Order Tracking, Where to Wear It and Safety are open.
+- **After delivery, a guided journey:** 1 pair, prepare skin and calibrate → 2 pick first-month
+  skills in the cylindrical skill vault (the main prototype's `MarketplaceFrame`, bundled from
+  `standalone/vault-entry.jsx` and styled by a Tailwind build scoped to `#vault`) → 3 personalised
+  plan per skill (session length from stamina and recovery, type-specific limits, placement and
+  waiting-list notes, four-week schedule, bundle vs pay per session) → 4 pay → 5–7 Where to Wear
+  It, Safety, Hardware (each skippable). Afterwards the manual opens on Your Sessions, which runs
+  the paid plan. The profile starts from the buyer's online check and is replaced by the patch
+  reading after calibration. Prototype controls can mark delivery, pair, finish setup and replay
+  the journey.
 
 The head scan (“Lee Perry-Smith”, Infinite-Realities, CC BY 3.0) and its textures are embedded as
 base64. `standalone/manual-app.jsx` is the readable source of the file's app script.
