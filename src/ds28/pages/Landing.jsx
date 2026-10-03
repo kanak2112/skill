@@ -45,7 +45,7 @@ export default function Landing({ onStart, order, onOrder }) {
             <PatchSVG shape={presetShape(m.shape)} color={m.color} glow={0.8} className="h-40 w-40" />
           </div>
         ) : (
-          <HeadViewer onMorph={setIdx} onState={setState} />
+          <HeadViewer active={idx} onActive={setIdx} onState={setState} />
         )}
       </div>
       <p className="relative z-10 -mt-6 px-4 text-center text-caption text-muted" aria-live="polite">

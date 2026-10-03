@@ -126,7 +126,9 @@ export const INDIAN_STATES = [
 ];
 
 export const findFinish = (id) => FINISHES.find((f) => f.id === id) ?? FINISHES[0];
-export const findNode = (id) => NODES.find((n) => n.id === id) ?? NODES[0];
+export function findNode(id) {
+  return NODES.find((n) => n.id === id) ?? NODES[0];
+}
 export const findSkill = (id) => SKILLS.find((s) => s.id === id) ?? SKILLS[0];
 export const findDelivery = (id) => DELIVERY.find((d) => d.id === id) ?? DELIVERY[0];
 
@@ -177,4 +179,71 @@ export function fmtMinutes(mins) {
 /** Order numbers look like NS-482913; hardware IDs like DS28-ANG-241. */
 export function makeOrderNumber() {
   return `NS-${String(100000 + Math.floor(Math.random() * 900000))}`;
+}
+
+/* ───────── Hardware status, baseline and recommendations ───────── */
+
+/** IN_TRANSIT until the courier delivers, DELIVERED once it arrives, PAIRED once the ID is entered. */
+export function hardwareStatus(order) {
+  if (!order) return 'NO_ORDER';
+  if (order.paired) return 'PAIRED';
+  return order.stage >= ORDER_STAGES.length - 1 ? 'DELIVERED' : 'IN_TRANSIT';
+}
+
+const hashStr = (s) => [...s].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 2166136261);
+
+/**
+ * Baseline the patch records during calibration: how steady you hold still, how quickly your
+ * muscles respond, and how long they keep a clean signal before tiring. Prototype values are
+ * derived from the hardware ID and wearing spot so they stay the same for the same patch.
+ */
+export function measureBaseline(serial, nodeId, at = new Date()) {
+  const h = hashStr(`${serial}:${nodeId}`);
+  const pick = (shift, min, span) => min + ((h >>> shift) % (span + 1));
+  return {
+    measuredAt: at.toISOString(),
+    nodeId,
+    steadiness: pick(0, 58, 34), // % of the hold with tremor below threshold
+    response: pick(5, 180, 90), // ms from intent to muscle response
+    endurance: pick(11, 35, 85), // minutes before signal fatigue
+  };
+}
+
+export const loggedMinutes = (history = []) => history.reduce((a, s) => a + s.minutes, 0);
+
+const NODE_FIT = { base: ['temple', 'cervical', 'forearm'], master: ['temple', 'forearm'], virtuoso: ['temple'] };
+
+/**
+ * Recommend a skill and session length from the measured baseline and stream history.
+ * Every rule is returned with its result so the screen can show exactly why.
+ */
+export function recommend(baseline, history = [], nodeId = 'temple') {
+  const mins = loggedMinutes(history);
+  const sessions = history.length;
+  const checks = {
+    base: [{ ok: true, text: 'Open to everyone' }, { ok: NODE_FIT.base.includes(nodeId), text: 'Works at any wearing spot' }],
+    master: [
+      { ok: mins >= 300, text: `5 hours of streaming logged (you have ${fmtMinutes(mins || 0) || '0 min'})` },
+      { ok: baseline.steadiness >= 70, text: `Steadiness of 70% or more (yours: ${baseline.steadiness}%)` },
+      { ok: NODE_FIT.master.includes(nodeId), text: `Worn on temple or forearm (yours: ${findNode(nodeId).name.toLowerCase()})` },
+    ],
+    virtuoso: [
+      { ok: mins >= 2400, text: `40 hours of streaming logged (you have ${fmtMinutes(mins || 0) || '0 min'})` },
+      { ok: baseline.steadiness >= 82, text: `Steadiness of 82% or more (yours: ${baseline.steadiness}%)` },
+      { ok: baseline.response <= 220, text: `Response of 220 ms or faster (yours: ${baseline.response} ms)` },
+      { ok: nodeId === 'temple', text: 'Worn on the temple' },
+    ],
+  };
+  const ready = Object.fromEntries(Object.entries(checks).map(([k, v]) => [k, v.every((c) => c.ok)]));
+  const skillId = ready.virtuoso ? 'virtuoso' : ready.master ? 'master' : 'base';
+
+  // Session length: stay inside your measured endurance, and keep the first three sessions short.
+  const capByEndurance = Math.max(30, Math.floor((baseline.endurance * 2) / 15) * 15);
+  const firstSessions = sessions < 3;
+  const minutes = Math.min(firstSessions ? 60 : 240, capByEndurance);
+  const lengthReasons = [
+    { ok: true, text: `Up to twice your signal endurance of ${baseline.endurance} min, rounded down: ${fmtMinutes(capByEndurance)}` },
+    { ok: !firstSessions, text: firstSessions ? `First three sessions are capped at 1 h (${sessions} done so far)` : 'Past your first three sessions' },
+  ];
+  return { skillId, minutes, checks, ready, lengthReasons, loggedMinutes: mins, sessions };
 }

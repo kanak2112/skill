@@ -73,3 +73,28 @@ describe('shell generation', () => {
     expect(r.finishId).toBe('red');
   });
 });
+
+import { hardwareStatus, measureBaseline, recommend } from '../data.js';
+
+describe('hardware status and recommendations', () => {
+  it('moves from in transit to delivered to paired', () => {
+    expect(hardwareStatus(null)).toBe('NO_ORDER');
+    expect(hardwareStatus({ stage: 2 })).toBe('IN_TRANSIT');
+    expect(hardwareStatus({ stage: 5 })).toBe('DELIVERED');
+    expect(hardwareStatus({ stage: 5, paired: true })).toBe('PAIRED');
+  });
+  it('measures a stable baseline for the same patch and spot', () => {
+    expect(measureBaseline('DS28-ANG-241', 'temple').steadiness).toBe(measureBaseline('DS28-ANG-241', 'temple').steadiness);
+  });
+  it('recommends Base Motor and short sessions to new users, and explains why', () => {
+    const r = recommend({ steadiness: 90, response: 200, endurance: 80 }, [], 'temple');
+    expect(r.skillId).toBe('base');
+    expect(r.minutes).toBe(60);
+    expect(r.checks.master.find((c) => !c.ok).text).toMatch(/5 hours/);
+  });
+  it('recommends Virtuoso only when every rule passes', () => {
+    const r = recommend({ steadiness: 90, response: 200, endurance: 80 }, [{ minutes: 2500 }, { minutes: 10 }, { minutes: 10 }], 'temple');
+    expect(r.skillId).toBe('virtuoso');
+    expect(r.minutes).toBe(150);
+  });
+});
