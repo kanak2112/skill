@@ -16,6 +16,8 @@ export const MORPHS = [
 // Relative URLs resolve next to the page, both in dev (/ds28/head/…) and when published.
 const ASSET = './head/';
 const TURN_MS = 16000;
+// Hosts that can't serve .glb can point this at a glTF JSON copy before the app loads.
+const MODEL_URL = (typeof window !== 'undefined' && window.__DS28_HEAD_MODEL) || `${ASSET}LeePerrySmith.glb`;
 
 /** Draw a shell onto a canvas so it can be projected onto the skin as a decal texture. */
 function shellTexture(morph) {
@@ -128,7 +130,7 @@ export default function HeadViewer({ onMorph, onState }) {
     const load = (url) => new Promise((res, rej) => tl.load(url, res, undefined, rej));
 
     Promise.all([
-      new Promise((res, rej) => new GLTFLoader().load(`${ASSET}LeePerrySmith.glb`, res, undefined, rej)),
+      new Promise((res, rej) => new GLTFLoader().load(MODEL_URL, res, undefined, rej)),
       load(`${ASSET}Map-COL.jpg`),
       load(`${ASSET}Infinite-Level_02_Tangent_SmoothUV.jpg`),
     ])
