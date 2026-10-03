@@ -100,3 +100,14 @@ for first-person video. To use real clips, add muted MP4s to `public/footage/` a
 | `src/hooks/useCylinder.js` | Rotation / row physics, gestures, wheel, snapping |
 | `src/components/VaultTile.jsx`, `ModelVisuals.jsx` | Tile + provenance visual language |
 | `src/hooks/useSessionTimer.js` | Session lifecycle, kept in `App` across frame switches |
+
+## Standalone Web Manual (`standalone/Neural_Stream_Manual.html`)
+
+A single self-contained HTML file built on the original diagnostic manual (same Tailwind CDN, React
+UMD + in-browser Babel and Lucide setup). Open it directly in a browser. It combines the Shape Studio
+(live Three.js head with orbit controls; describe, pick or draw a shell; colour and finish; temple,
+neck or forearm), an Indian delivery checkout in ₹, and the Web Manual. Calibration, skill rental,
+the copy-protection practice and the hardware guide stay locked until the order is delivered and
+paired; a “Prototype controls” switch simulates unboxing for testing. The head scan
+(“Lee Perry-Smith”, Infinite-Realities, CC BY 3.0) and its textures are embedded as base64.
+`standalone/manual-app.jsx` is the readable source of the file's app script.
