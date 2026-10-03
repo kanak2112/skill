@@ -1,70 +1,75 @@
 import { describe, expect, it } from 'vitest';
-import { PRICING, cooldownHours, formatHours, planPrice, planLabel, SKILLS } from '../data.js';
-import { analyzePersona, evolvePersona, TRAITS } from '../persona.js';
+import { PRICING, deliveryWindow, fmtMinutes, inr, orderTotal, streamPlan, validateAddress, makeOrderNumber } from '../data.js';
 import { makeSerial, parsePrompt, strokesToPath, traceImage } from '../shapes.js';
 
-describe('pricing', () => {
-  it('hardware totals $340', () => {
-    expect(PRICING.core + PRICING.shell).toBe(340);
+const good = { name: 'Asha Rao', phone: '98765 43210', line1: '12B, Lake View Apartments', line2: '', city: 'Pune', state: 'Maharashtra', pin: '411001' };
+
+describe('pricing (INR)', () => {
+  it('kit plus shell is ₹48,900 including GST', () => {
+    expect(PRICING.kit + PRICING.shell).toBe(48900);
+    expect(inr(48900)).toBe('₹48,900');
+    expect(inr(123400)).toBe('₹1,23,400');
   });
-  it('prices rentals per hour and subscriptions per month', () => {
-    expect(planPrice({ skillId: 'surgeon', billing: 'rental', hours: 3 })).toBe(360);
-    expect(planPrice({ skillId: 'heavy', billing: 'monthly', hours: 3 })).toBe(899);
-    expect(SKILLS.map((s) => [s.rate, s.monthly])).toEqual([[48, 199], [120, 499], [250, 899]]);
-    expect(planLabel({ skillId: 'craftsman', billing: 'rental', hours: 2 })).toBe('Master Craftsman · 2 h rental');
+  it('adds express delivery only when chosen', () => {
+    expect(orderTotal('standard')).toBe(48900);
+    expect(orderTotal('express')).toBe(49399);
   });
-  it('scales cooldown with override and never drops below an hour', () => {
-    expect(cooldownHours(6, 90)).toBeCloseTo(8.1);
-    expect(cooldownHours(0.1, 75)).toBe(1);
-    expect(formatHours(8.1)).toBe('8h 06m');
-    expect(formatHours(3)).toBe('3h');
+  it('gives a delivery window in days from the order date', () => {
+    const from = new Date('2035-03-01T10:00:00Z');
+    const [a, b] = deliveryWindow('standard', from);
+    expect((a - from) / 864e5).toBe(5);
+    expect((b - from) / 864e5).toBe(7);
   });
 });
 
-describe('persona profiler', () => {
-  it('returns null for empty input', () => {
-    expect(analyzePersona('   ')).toBeNull();
+describe('address validation', () => {
+  it('accepts a complete Indian address', () => {
+    expect(validateAddress(good)).toEqual({});
+    expect(validateAddress({ ...good, phone: '+91 98765 43210' })).toEqual({});
   });
-  it('detects archetypes from keywords and is deterministic', () => {
-    const a = analyzePersona('software engineer who reads AI research papers at university');
-    expect(a.primary).toBe('Logical Strategist');
-    expect(a.secondary).toBe('Academic Explorer');
-    expect(analyzePersona('software engineer who reads AI research papers at university')).toEqual(a);
-  });
-  it('keeps traits within 0–100 after evolution', () => {
-    const p = analyzePersona('athlete gym runner climber');
-    const e = evolvePersona(p, 'heavy');
-    expect(e.title).toBe('High-Load Industrial Operative');
-    for (const t of TRAITS) {
-      expect(e.traits[t.id]).toBeGreaterThanOrEqual(p.traits[t.id]);
-      expect(e.traits[t.id]).toBeLessThanOrEqual(100);
-    }
-    expect(e.gain).toBeGreaterThan(0);
+  it('flags each invalid field with a fix-it message', () => {
+    const e = validateAddress({ ...good, phone: '12345', pin: '011001', state: 'Atlantis', city: ' ' });
+    expect(Object.keys(e).sort()).toEqual(['city', 'phone', 'pin', 'state']);
+    expect(e.pin).toMatch(/6-digit/);
   });
 });
 
-describe('shape generation', () => {
-  it('parses the sample voice prompt', () => {
-    const r = parsePrompt('A glossy crimson anger glyph');
-    expect(r).toMatchObject({ presetId: 'anger', finishId: 'red', coating: 'gloss' });
+describe('stream planning', () => {
+  it('prices per hour and scales rest time by skill', () => {
+    const p = streamPlan('master', 120);
+    expect(p.cost).toBe(4300);
+    expect(p.rest).toBe(360);
+    expect(fmtMinutes(p.rest)).toBe('6 h');
+    expect(fmtMinutes(90)).toBe('1 h 30 min');
+  });
+  it('rates long Virtuoso sessions as high strain', () => {
+    expect(streamPlan('base', 30).level).toBe('Low');
+    expect(streamPlan('virtuoso', 480).level).toBe('High');
+  });
+});
+
+describe('shell generation', () => {
+  it('reads shape, colour and finish from a description', () => {
+    expect(parsePrompt('A glossy crimson anger glyph')).toMatchObject({ presetId: 'anger', finishId: 'red', coating: 'gloss' });
     expect(parsePrompt('Cyber cyan lightning bolt')).toMatchObject({ presetId: 'bolt', finishId: 'cyan' });
   });
-  it('builds a path from strokes and serials in the DS28-XXX-000 format', () => {
+  it('builds paths from strokes and IDs in the expected formats', () => {
     expect(strokesToPath([])).toBeNull();
     expect(strokesToPath([[[0, 0], [10, 10], [20, 0]]])).toMatch(/^M[\d.]+ [\d.]+ Q/);
     expect(makeSerial('ANG')).toMatch(/^DS28-ANG-\d{3}$/);
+    expect(makeOrderNumber()).toMatch(/^NS-\d{6}$/);
   });
-  it('traces an opaque square on a white background', () => {
+  it('traces an outline from an image', () => {
     const n = 10;
     const data = new Uint8ClampedArray(n * n * 4).fill(255);
     for (let y = 3; y < 7; y += 1)
       for (let x = 3; x < 7; x += 1) {
         const i = (y * n + x) * 4;
-        data[i] = 255; data[i + 1] = 42; data[i + 2] = 75;
+        data[i + 1] = 42;
+        data[i + 2] = 75;
       }
     const r = traceImage(data, n, 60);
     expect(r.coverage).toBeCloseTo(0.16);
     expect(r.finishId).toBe('red');
-    expect(r.d).toContain('M');
   });
 });

@@ -15,37 +15,36 @@ npm run build
 
 ## Neural Stream™ DS-28 (`/ds28/`)
 
-A second page in the same Vite project (`ds28/index.html` → `src/ds28/`). Open
-http://localhost:5173/ds28/ with `npm run dev`. React, plain CSS (`src/ds28/ds28.css`) and Lucide icons;
-no backend. `npm test` runs the Vitest suite for pricing, persona, prompt-parsing and tracing logic.
+A second page in the same Vite project (`ds28/index.html` → `src/ds28/`). Run `npm run dev` and open
+http://localhost:5173/ds28/. It uses the shared design system: `src/theme/tokens.js` through Tailwind,
+`src/index.css` component classes (`btn-primary`, `tag`, `metric`), Google Sans Flex only, and
+Material Symbols via `src/components/Icon.jsx`. Prices are in rupees with GST included.
+`npm test` runs the Vitest suite.
 
-**Mode 1 · Landing** (`pages/Landing.jsx`, `components/Head3D.jsx`): a procedural wireframe head on
-canvas (deformed sphere with brow, eye sockets, nose, lips, chin, ears and a neck, lit per vertex)
-rotates continuously and can be dragged. The temple patch is a DOM overlay turned with CSS 3D
-transforms to match the surface normal; it morphs (Anger Glyph → Volt Bolt → Teardrop → Hex Mesh, each
-with its own colour) while hidden behind the head on every turn. "GET YOURS NOW" plays a zoom and
-wipe into the purchase flow.
+**1 · Showcase** (`pages/Landing.jsx`, `components/HeadViewer.jsx`): a Three.js render of a scanned
+head (“Lee Perry-Smith” by Infinite-Realities, CC BY 3.0, files in `public/ds28/head/`) with colour
+and normal maps, physical skin material and a three-light studio rig. The shell is projected onto the
+temple as a decal and changes design each time it turns out of view. Drag to turn. Falls back to a
+flat shell image if WebGL is unavailable.
 
-**Mode 2 · Purchase flow** (three steps in the top bar)
-1. **Persona & skills** (`pages/Profiler.jsx`, `persona.js`): the user types a handle or short bio;
-   an on-device keyword profiler (no network) returns a primary / secondary archetype and six trait
-   scores. The marketplace offers each skill as a rental ($/hr, 1–8 prepaid hours) or monthly
-   subscription (Craftsman $48 / $199, Surgeon $120 / $499, Heavy $250 / $899). The evolution
-   preview tweens a radar chart from baseline to boosted traits and names the new persona.
-2. **Shape Studio**: voice prompt (quick tags such as "A glossy crimson anger glyph"), sketch canvas
-   and image trace; four finishes × three coatings; try-on on the Temple, Cervical and Forearm nodes.
-3. **Checkout**: Core Unit $280 + Bespoke Shell $60 + skill plan. "Confirm & Bond Shell" issues an ID
-   such as `DS28-ANG-241` and unlocks the Web Manual.
+**2 · Purchase** (three steps)
+1. **Design** — describe it (optional speech input), pick or draw it, or upload a picture to trace;
+   choose colour and finish; try it on the temple, neck or forearm.
+2. **Delivery** — name, mobile (+91), address, city, state and PIN with inline validation; standard
+   (free, 5–7 days) or express (₹499, 2 days) with dates.
+3. **Review & pay** — kit ₹44,900 + shell ₹4,000 + delivery. Choosing a payment method takes no
+   payment details. Placing the order issues an order number and a hardware ID (`DS28-VLT-756`).
 
-**Mode 3 · Web Manual** (`manual/`), themed from the bonded finish via `--acc`: 01 glow / stealth
-shell profile · 02 hold-to-calibrate ring · 03 rental / subscription switcher, 1–8 h session, live
-pricing (subscription hours count against a 40 h monthly cap), and live stream and cooldown timers on
-a demo clock (1× / 60× / 600×) that lock re-streaming until cleared · 04 topology inspector with
-impedance, 28-channel electrode seating map, SNR and latency per node · 05 safety disclaimers and the
-signal caching violation interlock.
+**3 · Web Manual** (`manual/`), built on the original diagnostic manual’s structure, in plain language:
+00 Your order (tracking timeline, then unbox and pair by typing the hardware ID from the box) ·
+01 Setup & calibration · 02 Skill rental · 03 Where to wear it (shows your shell) · 04 Safety ·
+05 What’s inside (your shell is layer 01).
 
-Persona, plan, design and the order (with console settings) are saved to localStorage when it is
-available.
+Hardware features are gated on order state: calibration and the copy-protection practice need a
+paired patch; starting a stream needs pairing and calibration. Planning, reading and the placement
+guide are available while the order is on its way. A “Next stage” prototype control advances the
+delivery. Design, address and order (with pairing, calibration and any live stream) are saved to
+localStorage when available.
 
 ## Design system
 

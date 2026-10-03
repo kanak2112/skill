@@ -1,158 +1,141 @@
-import { Play, Square, Gauge } from 'lucide-react';
-import { SKILLS, MONTHLY_HOURS, cooldownHours, findSkill, formatHours, usd } from '../data.js';
+import { useEffect, useState } from 'react';
+import Icon from '../../components/Icon.jsx';
+import { Card, Label, Title } from '../ui.jsx';
+import { SKILLS, findSkill, fmtMinutes, inr, streamPlan } from '../data.js';
 
-const H = 3600e3;
-const clock = (t) => new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-const hms = (ms) => {
-  const s = Math.max(0, Math.ceil(ms / 1000));
-  return [Math.floor(s / 3600), Math.floor((s % 3600) / 60), s % 60].map((n) => String(n).padStart(2, '0')).join(':');
+const LEVEL = {
+  Low: { color: '#5BBFBA', note: 'Comfortable for most people. No extra steps needed.' },
+  Medium: { color: '#F2A65A', note: 'Do the 5-minute hand reset exercise afterwards, and don’t drive during rest time.' },
+  High: { color: '#E06D53', note: 'Needs someone with you during the session and three days off before the next Virtuoso stream.' },
 };
 
-/** Rental vs subscription pricing, duration, and live stream / cooldown timers. */
-export default function RentalTab({ order, onPlan, onOrder, calibrated, session, onSession, now, speed, onSpeed, onCalibrate }) {
-  const { plan } = order;
-  const skill = findSkill(plan.skillId);
-  const hours = plan.hours;
-  const monthly = plan.billing === 'monthly';
-  const used = order.hoursUsed ?? 0;
-  const overCap = monthly && used + hours > MONTHLY_HOURS;
-  // Subscription hours past the monthly cap bill at the rental rate.
-  const sessionCost = monthly ? Math.max(0, used + hours - Math.max(used, MONTHLY_HOURS)) * skill.rate : skill.rate * hours;
-  const cooldown = cooldownHours(hours, skill.override);
+const clock = (d) => d.toLocaleString('en-IN', { weekday: 'short', hour: 'numeric', minute: '2-digit' });
 
-  const streaming = session && now < session.ends;
-  const cooling = session && !streaming && now < session.clears;
-  const locked = streaming || cooling;
+/** Plan a stream (always available) and start one (needs a paired, calibrated patch). */
+export default function RentalTab({ order, onOrder, onGo }) {
+  const [skillId, setSkillId] = useState('master');
+  const [mins, setMins] = useState(120);
+  const [now, setNow] = useState(Date.now());
+  const skill = findSkill(skillId);
+  const plan = streamPlan(skillId, mins);
+  const level = LEVEL[plan.level];
+  const session = order.session;
+  const live = session && now < session.ends;
+  const resting = session && !live && now < session.rests;
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
 
   const start = () => {
-    if (locked || !calibrated) return;
-    if (monthly) onOrder({ hoursUsed: used + hours });
-    onSession({ skill, hours, cooldown, starts: now, ends: now + hours * H, clears: now + (hours + cooldown) * H, cost: sessionCost });
+    const t = Date.now();
+    onOrder({ session: { skillId, mins, starts: t, ends: t + mins * 60e3, rests: t + (mins + plan.rest) * 60e3 } });
   };
   const stop = () => {
-    // Ending early still enforces cooldown, scaled to the time actually streamed.
-    const streamed = (now - session.starts) / H;
-    onSession({ ...session, ends: now, clears: now + cooldownHours(Math.max(streamed, 0.1), session.skill.override) * H });
+    const streamed = Math.max(1, (Date.now() - session.starts) / 60e3);
+    const s = findSkill(session.skillId);
+    onOrder({ session: { ...session, ends: Date.now(), rests: Date.now() + streamed * s.rest * 60e3 } });
   };
 
-  const phase = streaming ? 'stream' : cooling ? 'cool' : 'idle';
-  const total = session ? session.clears - session.starts : 1;
-  const pos = session ? Math.min(1, (now - session.starts) / total) : 0;
+  const blocker = !order.paired
+    ? { text: 'Streaming starts once your patch has arrived and is paired.', go: 'order', cta: 'Track my order' }
+    : !order.calibrated
+      ? { text: 'Calibrate first so the stream matches your skin contact today.', go: 'setup', cta: 'Calibrate' }
+      : null;
+  const pct = ((mins - 30) / (480 - 30)) * 100;
+  const left = (ms) => fmtMinutes(Math.max(0, Math.ceil(ms / 60e3)));
 
   return (
-    <div>
-      <div className="render-head">
-        <div>
-          <h2 className="panel-title">Stream Rental & Subscription Console</h2>
-          <p className="muted small">Switch billing, set the session length, and watch the mandatory cooldown play out.</p>
-        </div>
-        <div className="seg compact" role="radiogroup" aria-label="Billing">
-          {[['rental', 'Rental'], ['monthly', 'Subscription']].map(([id, label]) => (
-            <button key={id} role="radio" aria-checked={plan.billing === id} className={plan.billing === id ? 'active' : ''} onClick={() => onPlan({ billing: id })} disabled={locked}>
-              {label}
+    <div className="grid items-start gap-4 lg:grid-cols-5">
+      <Card className="lg:col-span-2">
+        <Label>Plan a stream</Label>
+        <Title className="mt-1">Choose a skill</Title>
+        <div className="mt-4 flex flex-col gap-2" role="radiogroup" aria-label="Skill">
+          {SKILLS.map((s) => (
+            <button
+              key={s.id}
+              role="radio"
+              aria-checked={skillId === s.id}
+              disabled={live}
+              onClick={() => setSkillId(s.id)}
+              className={`rounded-lg border p-3 text-left transition-colors disabled:opacity-50 ${skillId === s.id ? 'border-accent bg-accent/5' : 'border-line hover:border-muted/50'}`}
+            >
+              <span className="flex items-baseline justify-between gap-2">
+                <span className="text-title text-ink">{s.name}</span>
+                <span className="text-body tabular-nums text-ink">{inr(s.rate)}<span className="text-caption text-muted">/hr</span></span>
+              </span>
+              <span className="mt-1 block text-caption text-muted">{s.desc}</span>
             </button>
           ))}
         </div>
-      </div>
 
-      <div className="skill-grid" role="radiogroup" aria-label="Skill stream">
-        {SKILLS.map((s) => (
-          <button key={s.id} role="radio" aria-checked={plan.skillId === s.id} className={`skill ${plan.skillId === s.id ? 'active' : ''}`} onClick={() => onPlan({ skillId: s.id })} disabled={locked}>
-            <span className="skill-top">
-              <b>{s.name}</b>
-              <span className="mono">{monthly ? `${usd(s.monthly)}/mo` : `${usd(s.rate)}/hr`}</span>
-            </span>
-            <span className="override">
-              <svg viewBox="0 0 36 36" aria-hidden="true">
-                <circle cx="18" cy="18" r="15" className="ov-track" />
-                <circle cx="18" cy="18" r="15" className="ov-fill" strokeDasharray={`${(s.override / 100) * 94.2} 94.2`} transform="rotate(-90 18 18)" />
-              </svg>
-              <span className="mono">{s.override}%</span>
-              <span className="small muted">motor override</span>
-            </span>
-            <span className="small muted">Becomes: {s.evolves}</span>
-          </button>
-        ))}
-      </div>
-
-      <div className="rental-calc card-inset">
-        <label className="duration">
-          <span className="row-between">
-            <span>Session length</span>
-            <span className="mono big">{hours} h</span>
-          </span>
-          <input
-            type="range" min="1" max="8" step="1" value={hours}
-            onChange={(e) => onPlan({ hours: Number(e.target.value) })}
-            style={{ '--fill': `${((hours - 1) / 7) * 100}%` }}
-            aria-label="Session length in hours"
-            disabled={locked}
-          />
-          <span className="ticks mono small muted">{[1, 2, 3, 4, 5, 6, 7, 8].map((h) => <span key={h}>{h}</span>)}</span>
-        </label>
-
-        <div className="calc-out">
-          <div>
-            <span className="small muted">{monthly ? 'This session' : 'Rental total'}</span>
-            <b className="mono big acc">{usd(sessionCost)}</b>
-            <span className="mono small muted">
-              {monthly ? `${Math.min(locked ? used : used + hours, MONTHLY_HOURS)}/${MONTHLY_HOURS} h of plan${overCap && !locked ? ' · overage at hourly rate' : ''}` : `${usd(skill.rate)} × ${hours} h`}
-            </span>
-          </div>
-          <div>
-            <span className="small muted">Mandatory cooldown</span>
-            <b className="mono big warn">{formatHours(cooldown)}</b>
-            <span className="mono small muted">{hours} h × {skill.override}% × 1.5</span>
-          </div>
-          <div>
-            <span className="small muted">{monthly ? 'Effective rate' : 'Subscription would be'}</span>
-            <b className="mono big">{monthly ? `${usd(Math.round(skill.monthly / MONTHLY_HOURS))}/hr` : `${usd(skill.monthly)}/mo`}</b>
-            <span className="small muted">{monthly ? `at ${MONTHLY_HOURS} h/month` : `breaks even at ${Math.ceil(skill.monthly / skill.rate)} h/month`}</span>
-          </div>
+        <div className="mt-6 flex items-baseline justify-between">
+          <label htmlFor="duration" className="text-section text-muted">How long</label>
+          <span className="text-title tabular-nums text-accent">{fmtMinutes(mins)}</span>
         </div>
+        <input id="duration" type="range" min="30" max="480" step="15" value={mins} disabled={live} onChange={(e) => setMins(+e.target.value)} className="ds-range mt-4" style={{ '--pct': `${pct}%` }} />
+        <div className="mt-2 flex justify-between text-caption text-muted"><span>30 min</span><span>4 h</span><span>8 h</span></div>
+      </Card>
 
-        <div className={`timer card-inset phase-${phase}`} aria-live="polite">
-          <div className="timer-top">
-            <span className="mono small">
-              {phase === 'stream' ? `STREAMING · ${session.skill.name.toUpperCase()}` : phase === 'cool' ? 'BIOLOGICAL COOLDOWN · RE-STREAM LOCKED' : 'NO ACTIVE STREAM'}
-            </span>
-            <span className="speed mono small">
-              <Gauge size={14} aria-hidden="true" />
-              {[1, 60, 600].map((s) => (
-                <button key={s} className={speed === s ? 'active' : ''} onClick={() => onSpeed(s)} aria-pressed={speed === s}>{s}×</button>
-              ))}
-            </span>
+      <div className="flex flex-col gap-4 lg:col-span-3">
+        <Card>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div>
+              <Label>Cost</Label>
+              <p className="metric mt-1 text-ink">{inr(plan.cost)}</p>
+              <p className="text-caption text-muted">{inr(skill.rate)} × {fmtMinutes(mins)}</p>
+            </div>
+            <div>
+              <Label>Rest afterwards</Label>
+              <p className="metric mt-1 text-ink">{fmtMinutes(plan.rest)}</p>
+              <p className="text-caption text-muted">{skill.rest} h of rest per hour</p>
+            </div>
+            <div>
+              <Label>Strain</Label>
+              <p className="metric mt-1" style={{ color: level.color }}>{plan.level}</p>
+              <p className="text-caption text-muted">{plan.score} out of 100</p>
+            </div>
           </div>
-          <b className="mono timer-big">
-            {phase === 'stream' ? hms(session.ends - now) : phase === 'cool' ? hms(session.clears - now) : '00:00:00'}
-          </b>
-          <div className="cooldown-bar live">
-            <span className="seg-stream" style={{ flex: session ? session.ends - session.starts : hours }}>STREAM</span>
-            <span className="seg-cool" style={{ flex: session ? session.clears - session.ends : cooldown }}>COOLDOWN</span>
-            {session && <i className="playhead" style={{ left: `${pos * 100}%` }} />}
+          <div className="mt-5 flex h-2.5 w-full overflow-hidden rounded-full bg-canvas">
+            <div className="bg-accent transition-all duration-500" style={{ width: `${100 / (1 + skill.rest)}%` }} />
+            <div className="bg-muted/30 transition-all duration-500" style={{ width: `${(100 * skill.rest) / (1 + skill.rest)}%` }} />
           </div>
-          <span className="small muted">
-            {session
-              ? `Stream ${clock(session.starts)} → ${clock(session.ends)} · clear at ${clock(session.clears)} (demo clock)`
-              : `A ${hours} h stream started now clears at ${clock(now + (hours + cooldown) * H)}.`}
-          </span>
-        </div>
+          <p className="mt-2 text-caption text-muted">
+            <span className="mr-1.5 inline-block h-2 w-2 rounded-full bg-accent" />Stream
+            <span className="ml-4 mr-1.5 inline-block h-2 w-2 rounded-full bg-muted/50" />Rest: skilled tasks are paused, normal movement is fine
+          </p>
+          <p className="mt-4 rounded-lg bg-canvas p-3 text-body text-muted">
+            <span className="text-ink">{level.note}</span> Strain rises with longer sessions and more complex skills. It’s guidance, not a diagnosis.
+          </p>
+        </Card>
 
-        {!calibrated ? (
-          <div className="gate small">
-            <span>Signal not calibrated. Streams stay locked until epidermal coupling reads READY.</span>
-            <button className="btn btn-ghost small" onClick={onCalibrate}>Go to 02. Calibration</button>
-          </div>
-        ) : streaming ? (
-          <button className="btn btn-ghost wide" onClick={stop}>
-            <Square size={16} aria-hidden="true" /> End stream early (cooldown still applies)
-          </button>
-        ) : (
-          <button className="btn btn-primary wide" onClick={start} disabled={cooling}>
-            <Play size={16} aria-hidden="true" />
-            {cooling ? `Cooldown: ${hms(session.clears - now)} left` : `Start ${hours} h ${skill.name} stream · ${sessionCost ? usd(sessionCost) : 'included'}`}
-          </button>
-        )}
+        <Card>
+          {live ? (
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <span className="flex items-center gap-2 text-teal"><span className="pulse-dot inline-block h-2 w-2 rounded-full bg-teal text-teal" /><span className="text-title">{findSkill(session.skillId).name} is streaming</span></span>
+                <p className="mt-1 text-body text-muted">{left(session.ends - now)} left · ends {clock(new Date(session.ends))}</p>
+              </div>
+              <button className="btn-secondary" onClick={stop}><Icon name="stop_circle" size={18} /> End early</button>
+            </div>
+          ) : resting ? (
+            <div>
+              <span className="flex items-center gap-2 text-amber"><Icon name="bedtime" size={18} /><span className="text-title">Resting</span></span>
+              <p className="mt-1 text-body text-muted">You can start another stream in {left(session.rests - now)}, at {clock(new Date(session.rests))}.</p>
+            </div>
+          ) : blocker ? (
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="flex items-center gap-2 text-body text-muted"><Icon name="lock" size={18} />{blocker.text}</p>
+              <button className="btn-secondary h-9 text-[13px]" onClick={() => onGo(blocker.go)}>{blocker.cta}</button>
+            </div>
+          ) : (
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="text-body text-muted">If you start now, you’re free for skilled tasks again at <span className="text-ink">{clock(new Date(Date.now() + (mins + plan.rest) * 60e3))}</span>.</p>
+              <button className="btn-primary" onClick={start}><Icon name="play_arrow" size={18} /> Start stream · {inr(plan.cost)}</button>
+            </div>
+          )}
+        </Card>
       </div>
     </div>
   );

@@ -1,136 +1,128 @@
 import { useEffect, useRef, useState } from 'react';
+import Icon from '../../components/Icon.jsx';
 import { parsePrompt, presetShape } from '../shapes.js';
+import { findFinish } from '../data.js';
 
 const EXAMPLES = [
   'A glossy crimson anger glyph',
   'Cyber cyan lightning bolt',
-  'Matte gold teardrop with satin pearl coating',
-  'Stealth slate hexagon, brushed and flat',
-  'Sculpt a sharp crimson anger symbol with glossy metallic bevels',
+  'Matte gold teardrop',
+  'Satin heart in stealth slate',
 ];
 
-const LOG = ['Parsing intent tokens', 'Resolving form primitive', 'Lofting bevel geometry', 'Baking coating map'];
-
-/** Voice prompt: real speech recognition where the browser allows it, simulated dictation otherwise. */
+/** Describe a shell in words. Speech input where the browser allows it, typing otherwise. */
 export default function VoiceInput({ design, onChange }) {
   const [text, setText] = useState(design.prompt ?? EXAMPLES[0]);
   const [listening, setListening] = useState(false);
-  const [step, setStep] = useState(-1);
-  const [tokens, setTokens] = useState(() => parsePrompt(design.prompt ?? EXAMPLES[0]).tokens);
-  const timers = useRef([]);
+  const [busy, setBusy] = useState(false);
+  const [heardNothing, setHeardNothing] = useState(false);
+  const timer = useRef(0);
   const recog = useRef(null);
-
   useEffect(() => () => {
-    timers.current.forEach(clearTimeout);
+    clearTimeout(timer.current);
     recog.current?.abort?.();
   }, []);
 
-  const later = (fn, ms) => timers.current.push(setTimeout(fn, ms));
-
-  const simulateDictation = (phrase) => {
-    setText('');
-    [...phrase].forEach((_, i) => later(() => setText(phrase.slice(0, i + 1)), 28 * i));
-    later(() => setListening(false), 28 * phrase.length + 120);
-  };
+  const SR = typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition);
 
   const listen = () => {
-    if (listening) return;
-    setListening(true);
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    const fallback = () => simulateDictation(EXAMPLES[0]);
-    if (!SR) return fallback();
+    if (!SR || listening) return;
+    setHeardNothing(false);
     try {
       const r = new SR();
       recog.current = r;
-      r.lang = 'en-US';
+      r.lang = 'en-IN';
       r.interimResults = true;
       let heard = false;
       r.onresult = (e) => {
         heard = true;
-        setText([...e.results].map((res) => res[0].transcript).join(' '));
-      };
-      r.onerror = () => {
-        if (!heard) fallback();
-        else setListening(false);
+        setText([...e.results].map((x) => x[0].transcript).join(' '));
       };
       r.onend = () => {
-        if (heard) setListening(false);
+        setListening(false);
+        if (!heard) setHeardNothing(true);
       };
+      r.onerror = () => {
+        setListening(false);
+        setHeardNothing(true);
+      };
+      setListening(true);
       r.start();
     } catch {
-      fallback();
+      setListening(false);
+      setHeardNothing(true);
     }
   };
 
-  const synthesize = () => {
-    if (step >= 0 || !text.trim()) return;
-    const parsed = parsePrompt(text);
-    setTokens(parsed.tokens);
-    LOG.forEach((_, i) => later(() => setStep(i), i * 280));
-    later(() => {
-      setStep(-1);
-      const shape = presetShape(parsed.presetId);
-      if (parsed.tokens.some((t) => t.kind === 'edge')) shape.cap = 'butt';
+  const create = (value = text) => {
+    if (busy || !value.trim()) return;
+    setBusy(true);
+    const parsed = parsePrompt(value);
+    timer.current = setTimeout(() => {
+      setBusy(false);
       onChange({
-        shape: { ...shape, source: 'voice' },
-        prompt: text,
+        shape: { ...presetShape(parsed.presetId), source: 'description' },
+        prompt: value,
         ...(parsed.finishId && { finishId: parsed.finishId }),
         ...(parsed.coating && { coating: parsed.coating }),
       });
-    }, LOG.length * 280 + 200);
+    }, 700);
   };
 
+  const parsed = parsePrompt(design.prompt ?? text);
+
   return (
-    <div className="voice">
-      <div className={`voice-box ${listening ? 'listening' : ''}`}>
-        <button className={`mic ${listening ? 'on' : ''}`} onClick={listen} aria-label="Dictate prompt">
-          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
-            <rect x="9" y="3" width="6" height="11" rx="3" fill="none" stroke="currentColor" strokeWidth="1.6" />
-            <path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21" fill="none" stroke="currentColor" strokeWidth="1.6" />
-          </svg>
-        </button>
+    <div className="flex flex-col gap-4">
+      <label htmlFor="prompt" className="text-section text-muted">Describe the shape and colour you want</label>
+      <div className={`flex gap-2 rounded-lg border bg-canvas p-2 transition-colors ${listening ? 'border-accent' : 'border-line focus-within:border-accent/60'}`}>
         <textarea
+          id="prompt"
+          rows={2}
           value={text}
           onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) synthesize();
-          }}
-          rows={3}
-          aria-label="Sculpt prompt"
-          placeholder="Describe your shell…"
+          onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), create())}
+          className="min-w-0 flex-1 resize-none bg-transparent px-2 py-1.5 text-[15px] text-ink outline-none placeholder:text-muted"
+          placeholder="For example: a glossy crimson anger glyph"
         />
-        {listening && (
-          <div className="wave" aria-hidden="true">
-            {Array.from({ length: 18 }, (_, i) => <span key={i} style={{ animationDelay: `${i * 60}ms` }} />)}
-          </div>
+        {SR && (
+          <button
+            onClick={listen}
+            className={`grid h-10 w-10 shrink-0 place-items-center self-start rounded-lg border ${listening ? 'border-accent bg-accent text-[#0F172A]' : 'border-line text-muted hover:text-ink'}`}
+            aria-label={listening ? 'Listening' : 'Speak your description'}
+          >
+            <Icon name={listening ? 'graphic_eq' : 'mic'} size={20} />
+          </button>
         )}
       </div>
+      {heardNothing && <p className="text-caption text-amber">Didn’t catch that. Check microphone access, or type your description instead.</p>}
 
-      <div className="chips">
+      <div className="flex flex-wrap gap-2">
         {EXAMPLES.map((ex) => (
-          <button key={ex} className="chip chip-btn" onClick={() => setText(ex)}>{ex}</button>
+          <button
+            key={ex}
+            onClick={() => {
+              setText(ex);
+              create(ex);
+            }}
+            className="tag border border-line text-muted hover:border-accent/60 hover:text-ink"
+          >
+            {ex}
+          </button>
         ))}
       </div>
 
-      <button className="btn btn-primary wide" onClick={synthesize} disabled={step >= 0}>
-        {step >= 0 ? `${LOG[step]}…` : 'Synthesize shell'}
+      <button className="btn-primary" onClick={() => create()} disabled={busy}>
+        <Icon name="auto_awesome" size={18} /> {busy ? 'Creating your shape…' : 'Create shape'}
       </button>
-      {step >= 0 && (
-        <div className="progress"><span style={{ width: `${((step + 1) / LOG.length) * 100}%` }} /></div>
-      )}
 
-      <div className="tokens">
-        <p className="mono small muted">PARSED INTENT</p>
-        <ul>
-          {tokens.map((t) => (
-            <li key={t.kind}>
-              <span className="mono tok-k">{t.kind}</span>
-              <span className="tok-v">“{t.value}”</span>
-              <span className="mono small muted">→ {t.resolved}</span>
-            </li>
-          ))}
-        </ul>
-      </div>
+      {design.shape.source === 'description' && (
+        <p className="text-caption text-muted">
+          We read: <span className="text-ink">{presetShape(parsed.presetId).name}</span>
+          {parsed.finishId && <> · <span className="text-ink">{findFinish(parsed.finishId).name}</span></>}
+          {parsed.coating && <> · <span className="text-ink capitalize">{parsed.coating}</span> finish</>}
+          . Anything you don’t mention keeps its current setting.
+        </p>
+      )}
     </div>
   );
 }

@@ -1,117 +1,95 @@
-import { useEffect, useState } from 'react';
-import { Layers, Activity, Timer, Network, ShieldAlert, RotateCcw } from 'lucide-react';
-import PatchSVG from '../components/PatchSVG.jsx';
-import ShellTab from './ShellTab.jsx';
-import CalibrationTab from './CalibrationTab.jsx';
+import { useState } from 'react';
+import Icon from '../../components/Icon.jsx';
+import OrderTab from './OrderTab.jsx';
+import SetupTab from './SetupTab.jsx';
 import RentalTab from './RentalTab.jsx';
-import TopologyTab from './TopologyTab.jsx';
+import MapTab from './MapTab.jsx';
 import SafetyTab from './SafetyTab.jsx';
-import { findFinish, findNode, findSkill } from '../data.js';
-import { evolvePersona } from '../persona.js';
+import HardwareTab from './HardwareTab.jsx';
+import { ORDER_STAGES, deliveryWindow, findNode, shortDate } from '../data.js';
 
 const TABS = [
-  { id: 'shell', n: '01', label: 'Shell Configurator', Icon: Layers },
-  { id: 'calib', n: '02', label: 'Signal Calibration', Icon: Activity },
-  { id: 'rental', n: '03', label: 'Stream & Subscription', Icon: Timer },
-  { id: 'topo', n: '04', label: 'Topology Inspector', Icon: Network },
-  { id: 'safety', n: '05', label: 'Safety & DRM', Icon: ShieldAlert },
+  { id: 'order', code: '00', label: 'Your order', icon: 'package_2' },
+  { id: 'setup', code: '01', label: 'Setup & calibration', icon: 'my_location', needsPatch: true },
+  { id: 'rental', code: '02', label: 'Skill rental', icon: 'speed' },
+  { id: 'map', code: '03', label: 'Where to wear it', icon: 'accessibility_new' },
+  { id: 'safety', code: '04', label: 'Safety', icon: 'health_and_safety' },
+  { id: 'hardware', code: '05', label: 'What’s inside', icon: 'memory' },
 ];
 
-const hexRgb = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)).join(', ');
-
-/** Simulated clock so multi-hour streams and cooldowns can be watched at demo speed. */
-function useSimClock(speed) {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const id = setInterval(() => setNow((n) => n + 250 * speed), 250);
-    return () => clearInterval(id);
-  }, [speed]);
-  return now;
+/** Status pill: order progress before delivery, pairing after. */
+function Status({ order }) {
+  const node = findNode(order.design.nodeId);
+  const delivered = order.stage >= ORDER_STAGES.length - 1;
+  if (order.paired)
+    return (
+      <span className="tag gap-2 border border-teal/30 bg-teal/10 text-teal">
+        <span className="pulse-dot inline-block h-2 w-2 rounded-full bg-teal text-teal" />
+        Patch connected · {node.name}
+      </span>
+    );
+  if (delivered)
+    return (
+      <span className="tag gap-1.5 border border-amber/30 bg-amber/10 text-amber">
+        <Icon name="inventory_2" size={14} /> Delivered · not paired yet
+      </span>
+    );
+  const [, to] = deliveryWindow(order.deliveryId, new Date(order.placedAt));
+  return (
+    <span className="tag gap-1.5 border border-line text-muted">
+      <Icon name="local_shipping" size={14} /> {ORDER_STAGES[order.stage].label} · arrives by {shortDate(to)}
+    </span>
+  );
 }
 
-/** Post-purchase console. Accents derive from the bonded shell finish; state is saved on the order. */
-export default function Manual({ order, onOrder, onNewShell }) {
-  const [tab, setTab] = useState('shell');
-  const [speed, setSpeed] = useState(60);
-  const [session, setSession] = useState(null);
-  const now = useSimClock(speed);
-  const { design, serial, plan, persona } = order;
-  const glowMode = order.glowMode ?? 'glow';
-  const calibrated = !!order.calibrated;
-  const finish = findFinish(design.finishId);
-  const node = findNode(design.nodeId);
-  const skill = findSkill(plan.skillId);
-  const evolved = persona ? evolvePersona(persona, plan.skillId).title : skill.evolves;
-
-  const streaming = session && now < session.ends;
-  const cooling = session && !streaming && now < session.clears;
+/** Mode 3: the Web Manual. Hardware features stay locked until the patch is delivered and paired. */
+export default function Manual({ order, onOrder, onNewOrder }) {
+  const [tab, setTab] = useState(order.paired ? 'setup' : 'order');
+  const [glitch, setGlitch] = useState(false);
+  const locked = (t) => t.needsPatch && !order.paired;
 
   return (
-    <div className="manual" style={{ '--acc': finish.ui, '--acc-rgb': hexRgb(finish.ui) }}>
-      <header className="manual-head card">
-        <div className="manual-id">
-          <div className="manual-thumb">
-            <PatchSVG shape={design.shape} color={finish.hex} coating={design.coating} glow={glowMode === 'glow' ? 0.8 : 0} stealth={glowMode === 'stealth'} />
-          </div>
-          <div>
-            <p className="mono small muted">WEB MANUAL · PROFILE SYNCED</p>
-            <h1 className="mono serial-head">{serial}</h1>
-            <p className="small muted">
-              {design.shape.name} · {finish.name} · {node.name} · {plan.billing === 'monthly' ? 'Subscription' : 'Rental'}: {skill.name}
-            </p>
-          </div>
+    <div className={glitch ? 'glitch' : ''}>
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line bg-surface px-5 py-4">
+        <div className="min-w-0">
+          <p className="text-section text-muted">Web Manual · order {order.number}</p>
+          <p className="mt-0.5 text-screen type-screen text-ink">
+            Hardware ID <span className="tabular-nums text-accent">{order.serial}</span>
+          </p>
         </div>
-        <div className="manual-status mono small">
-          <span className={`pill ${calibrated ? 'ok' : 'warn'}`}>{calibrated ? 'COUPLED' : 'UNCALIBRATED'}</span>
-          <span className={`pill ${streaming ? 'ok' : cooling ? 'warn' : ''}`}>
-            {streaming ? `LIVE: ${evolved.toUpperCase()}` : cooling ? 'COOLDOWN' : 'NO STREAM'}
-          </span>
-          <span className="pill">{glowMode === 'glow' ? 'LOAD GLOW' : 'STEALTH'}</span>
+        <Status order={order} />
+      </div>
+
+      <nav className="mt-4" aria-label="Manual sections">
+        <div role="tablist" className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+          {TABS.map((t) => {
+            const on = t.id === tab;
+            return (
+              <button
+                key={t.id}
+                role="tab"
+                aria-selected={on}
+                onClick={() => setTab(t.id)}
+                className={`group rounded-lg border px-3.5 py-3 text-left transition-colors ${on ? 'border-accent/60 bg-surface' : 'border-line hover:bg-surface/60'}`}
+              >
+                <span className="flex items-center justify-between">
+                  <span className={`text-caption tabular-nums ${on ? 'text-accent' : 'text-muted'}`}>{t.code}</span>
+                  <Icon name={locked(t) ? 'lock' : t.icon} size={16} className={on ? 'text-accent' : 'text-muted group-hover:text-ink'} />
+                </span>
+                <span className={`mt-1 block text-[14px] font-medium leading-snug ${on ? 'text-ink' : 'text-ink/75'}`}>{t.label}</span>
+              </button>
+            );
+          })}
         </div>
-      </header>
+      </nav>
 
-      <div className="manual-body">
-        <nav className="manual-tabs" role="tablist" aria-label="Web Manual sections">
-          {TABS.map(({ id, n, label, Icon }) => (
-            <button key={id} role="tab" aria-selected={tab === id} className={`mtab ${tab === id ? 'active' : ''}`} onClick={() => setTab(id)}>
-              <span className="mono mtab-n">{n}.</span>
-              <Icon size={16} aria-hidden="true" className="mtab-icon" />
-              <span>{label}</span>
-            </button>
-          ))}
-          <button className="mtab reset" onClick={onNewShell}>
-            <RotateCcw size={14} aria-hidden="true" className="mtab-icon" />
-            <span>Design a new shell</span>
-          </button>
-        </nav>
-
-        <section key={tab} className="manual-panel card page-enter" role="tabpanel">
-          {tab === 'shell' && <ShellTab order={order} mode={glowMode} onMode={(m) => onOrder({ glowMode: m })} />}
-          {tab === 'calib' && <CalibrationTab node={node} calibrated={calibrated} onCalibrated={(v) => onOrder({ calibrated: v })} />}
-          {tab === 'rental' && (
-            <RentalTab
-              order={order}
-              onPlan={(p) => onOrder({ plan: { ...plan, ...p } })}
-              onOrder={onOrder}
-              calibrated={calibrated}
-              session={session}
-              onSession={setSession}
-              now={now}
-              speed={speed}
-              onSpeed={setSpeed}
-              onCalibrate={() => setTab('calib')}
-            />
-          )}
-          {tab === 'topo' && (
-            <TopologyTab
-              nodeId={design.nodeId}
-              calibrated={calibrated}
-              streaming={!!streaming}
-              onAssign={(id) => onOrder({ design: { ...design, nodeId: id }, calibrated: false })}
-            />
-          )}
-          {tab === 'safety' && <SafetyTab serial={serial} onLockout={() => setSession(null)} />}
-        </section>
+      <div key={tab} className="mt-4 fade-in">
+        {tab === 'order' && <OrderTab order={order} onOrder={onOrder} onGo={setTab} onNewOrder={onNewOrder} />}
+        {tab === 'setup' && <SetupTab order={order} onOrder={onOrder} onGo={setTab} />}
+        {tab === 'rental' && <RentalTab order={order} onOrder={onOrder} onGo={setTab} />}
+        {tab === 'map' && <MapTab order={order} onOrder={onOrder} />}
+        {tab === 'safety' && <SafetyTab order={order} onGlitch={setGlitch} onGo={setTab} />}
+        {tab === 'hardware' && <HardwareTab order={order} />}
       </div>
     </div>
   );

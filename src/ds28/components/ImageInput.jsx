@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
+import Icon from '../../components/Icon.jsx';
 import { traceImage } from '../shapes.js';
 import { findFinish } from '../data.js';
 
 const GRID = 40;
 
-/** Upload a reference image; it is traced to a 40 × 40 silhouette and snapped to the nearest finish. */
+/** Upload a logo or picture; its outline becomes the shell and its colour picks the nearest finish. */
 export default function ImageInput({ onChange }) {
   const [src, setSrc] = useState(null);
   const [threshold, setThreshold] = useState(60);
@@ -19,6 +20,13 @@ export default function ImageInput({ onChange }) {
     reader.readAsDataURL(file);
   };
 
+  const trace = (t) => {
+    if (!pixels.current) return;
+    const r = traceImage(pixels.current, GRID, t);
+    setResult(r);
+    if (r.d) onChange({ shape: { id: 'image', name: 'Your image', code: 'IMG', mode: 'fill', d: r.d, source: 'image' }, finishId: r.finishId });
+  };
+
   useEffect(() => {
     if (!src) return;
     const img = new Image();
@@ -27,9 +35,7 @@ export default function ImageInput({ onChange }) {
       c.width = c.height = GRID;
       const ctx = c.getContext('2d');
       const s = GRID / Math.max(img.width, img.height);
-      const w = img.width * s;
-      const h = img.height * s;
-      ctx.drawImage(img, (GRID - w) / 2, (GRID - h) / 2, w, h);
+      ctx.drawImage(img, (GRID - img.width * s) / 2, (GRID - img.height * s) / 2, img.width * s, img.height * s);
       pixels.current = ctx.getImageData(0, 0, GRID, GRID).data;
       trace(threshold);
     };
@@ -37,22 +43,10 @@ export default function ImageInput({ onChange }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [src]);
 
-  const trace = (t) => {
-    if (!pixels.current) return;
-    const r = traceImage(pixels.current, GRID, t);
-    setResult(r);
-    if (r.d) {
-      onChange({
-        shape: { id: 'image', name: 'Traced Emblem', code: 'IMG', mode: 'fill', d: r.d, source: 'image' },
-        finishId: r.finishId,
-      });
-    }
-  };
-
   return (
-    <div className="imagein">
+    <div className="flex flex-col gap-4">
       <label
-        className={`dropzone ${drag ? 'drag' : ''}`}
+        className={`flex min-h-[200px] cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed bg-canvas p-4 text-center transition-colors ${drag ? 'border-accent' : 'border-line hover:border-accent/60'}`}
         onDragOver={(e) => {
           e.preventDefault();
           setDrag(true);
@@ -64,46 +58,41 @@ export default function ImageInput({ onChange }) {
           load(e.dataTransfer.files[0]);
         }}
       >
-        <input type="file" accept="image/*" onChange={(e) => load(e.target.files[0])} hidden />
+        <input type="file" accept="image/*" className="sr-only" onChange={(e) => load(e.target.files[0])} />
         {src ? (
-          <img src={src} alt="Reference upload" />
+          <img src={src} alt="Your uploaded reference" className="max-h-[170px] max-w-full object-contain" />
         ) : (
           <>
-            <svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true">
-              <path d="M12 16V4M7 9l5-5 5 5M4 16v4h16v-4" fill="none" stroke="currentColor" strokeWidth="1.5" />
-            </svg>
-            <span>Drop a logo, glyph or photo</span>
-            <span className="mono small muted">PNG with transparency traces best</span>
+            <Icon name="upload" size={26} className="text-muted" />
+            <span className="text-title text-ink">Upload a logo, symbol or picture</span>
+            <span className="text-caption text-muted">PNG with a transparent or plain background works best</span>
           </>
         )}
       </label>
 
       {src && (
         <>
-          <label className="slider-row">
-            <span className="small">Trace sensitivity</span>
+          <label className="flex flex-col gap-2">
+            <span className="flex justify-between text-section text-muted">
+              <span>Outline detail</span>
+              <span className="text-ink">{threshold < 50 ? 'More' : threshold > 95 ? 'Less' : 'Balanced'}</span>
+            </span>
             <input
-              type="range"
-              min="15"
-              max="140"
-              value={threshold}
-              style={{ '--fill': `${((threshold - 15) / 125) * 100}%`, '--acc': '#00f0ff' }}
+              type="range" min="15" max="140" value={threshold}
               onChange={(e) => {
-                const t = Number(e.target.value);
-                setThreshold(t);
-                trace(t);
+                setThreshold(Number(e.target.value));
+                trace(Number(e.target.value));
               }}
+              className="ds-range"
+              style={{ '--pct': `${((threshold - 15) / 125) * 100}%` }}
             />
-            <span className="mono small">{threshold}</span>
           </label>
-          {result && (
-            <p className="mono small muted">
-              {result.d
-                ? `Silhouette coverage ${(result.coverage * 100).toFixed(0)}% · snapped to ${findFinish(result.finishId).name}`
-                : 'No clear silhouette found. Adjust sensitivity or try an image with a plain background.'}
-            </p>
-          )}
-          <button className="btn btn-ghost small" onClick={() => { setSrc(null); setResult(null); pixels.current = null; }}>
+          <p className="text-caption text-muted">
+            {result?.d
+              ? `Outline found. Colour matched to ${findFinish(result.finishId).name}; you can change it below.`
+              : 'We couldn’t find a clear outline. Try a picture with a plain background, or move the slider.'}
+          </p>
+          <button className="btn-secondary h-9 self-start text-[13px]" onClick={() => { setSrc(null); setResult(null); pixels.current = null; }}>
             Remove image
           </button>
         </>
