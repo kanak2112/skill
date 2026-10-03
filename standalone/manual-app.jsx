@@ -150,35 +150,6 @@ function measureBaseline(serial, node) {
 }
 const logged = (history = []) => history.reduce((a, s) => a + s.minutes, 0);
 
-/* Every rule is returned with its result so the screen can show exactly why. */
-function recommend(b, history, node) {
-  const mins = logged(history), sessions = history.length;
-  const checks = {
-    base: [{ ok: true, text: "Open to everyone, at any wearing spot" }],
-    master: [
-      { ok: mins >= 300, text: `5 h of streaming logged (you: ${fmtH(mins)})` },
-      { ok: b.steadiness >= 70, text: `Steadiness 70% or more (you: ${b.steadiness}%)` },
-      { ok: node !== "neck", text: `Worn on temple or forearm (you: ${NODES[node].name.toLowerCase()})` },
-    ],
-    virtuoso: [
-      { ok: mins >= 2400, text: `40 h of streaming logged (you: ${fmtH(mins)})` },
-      { ok: b.steadiness >= 82, text: `Steadiness 82% or more (you: ${b.steadiness}%)` },
-      { ok: b.response <= 220, text: `Reaction 0.22 s or quicker (you: ${(b.response / 1000).toFixed(2)} s)` },
-      { ok: node === "temple", text: `Worn on the temple (you: ${NODES[node].name.toLowerCase()})` },
-    ],
-  };
-  const ready = Object.fromEntries(Object.entries(checks).map(([k, v]) => [k, v.every((c) => c.ok)]));
-  const cls = ready.virtuoso ? "virtuoso" : ready.master ? "master" : "base";
-  const cap = Math.max(30, Math.floor((b.endurance * 2) / 15) * 15);
-  const first = sessions < 3;
-  const minutes = Math.min(first ? 60 : 240, cap);
-  const length = [
-    { ok: true, text: `No more than twice your stamina (${b.endurance} min): ${fmtH(cap)}` },
-    { ok: !first, text: first ? `First 3 sessions are capped at 1 h (you've done ${sessions})` : "Past your first 3 sessions" },
-  ];
-  return { cls, minutes, checks, ready, length, mins, sessions };
-}
-
 /* ───────────── Small shared pieces ───────────── */
 const Card = ({ children, className = "" }) => (
   <section className={`min-w-0 rounded-2xl border border-line bg-card ${className}`}>{children}</section>
@@ -977,11 +948,11 @@ function Checkout({ design, order, onPlace, onManual, onNewOrder }) {
 /* ───────────── Web Manual: tabs ───────────── */
 const TABS = [
   { id: "order",    code: "00", label: "Order Tracking",           icon: "Package",     needs: null },
-  { id: "onboard",  code: "01", label: "Onboarding & Calibration", icon: "Crosshair",   needs: "PAIRED" },
-  { id: "rental",   code: "02", label: "Skill Rental",             icon: "Gauge",       needs: "PAIRED" },
+  { id: "onboard",  code: "01", label: "Onboarding & Calibration", icon: "Crosshair",   needs: "DELIVERED" },
+  { id: "rental",   code: "02", label: "Skill Rental",             icon: "Gauge",       needs: "DELIVERED" },
   { id: "map",      code: "03", label: "Where to Wear It",         icon: "ScanLine",    needs: null },
   { id: "safety",   code: "04", label: "Safety & Compliance",      icon: "ShieldAlert", needs: null },
-  { id: "hardware", code: "05", label: "Hardware",                 icon: "Cpu",         needs: "PAIRED" },
+  { id: "hardware", code: "05", label: "Hardware",                 icon: "Cpu",         needs: "DELIVERED" },
 ];
 
 function Tabs({ tab, setTab, status }) {
@@ -989,7 +960,7 @@ function Tabs({ tab, setTab, status }) {
     <nav className="mx-auto max-w-6xl px-4 sm:px-6 pt-4" aria-label="Manual sections">
       <div role="tablist" className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
         {TABS.map((t) => {
-          const on = t.id === tab, locked = t.needs && status !== "PAIRED";
+          const on = t.id === tab, locked = t.needs && !["DELIVERED", "PAIRED"].includes(status);
           return (
             <button key={t.id} role="tab" aria-selected={on} onClick={() => setTab(t.id)}
               className={`group text-left rounded-xl border px-4 py-3 transition-colors ${on ? "border-brass/60 bg-card" : "border-line bg-transparent hover:bg-card/60"} ${locked && !on ? "opacity-60" : ""}`}>
@@ -1025,7 +996,10 @@ function DevBar({ order, setOrder, onDemo }) {
               <span>Simulate: product unboxed &amp; paired</span>
             </label>
             {!paired && order.stage < STAGES.length - 1 && (
-              <button className="btn-ghost !py-1" onClick={() => setOrder((o) => ({ ...o, stage: o.stage + 1 }))}>Next delivery stage</button>
+              <>
+                <button className="btn-ghost !py-1" onClick={() => setOrder((o) => ({ ...o, stage: o.stage + 1 }))}>Next delivery stage</button>
+                <button className="btn-ghost !py-1" id="dev-deliver" onClick={() => setOrder((o) => ({ ...o, stage: STAGES.length - 1 }))}>Mark as delivered</button>
+              </>
             )}
           </>
         ) : (
@@ -1036,12 +1010,12 @@ function DevBar({ order, setOrder, onDemo }) {
   );
 }
 
-function LockedPanel({ tab, order, setTab }) {
+function LockedPanel({ tab, order, setTab, setOrder }) {
   const status = statusOf(order);
   const what = {
-    onboard: "Skin preparation and live calibration need the real patch on your skin.",
-    rental: "Your skill profile, recommendations and streams are built from readings your own patch takes.",
-    hardware: "This guide is matched to the unit in your box, so it opens once that unit is paired.",
+    onboard: "Setup and calibration need the patch in your hands.",
+    rental: "Your personalised plan and sessions open with your patch.",
+    hardware: "This guide is matched to the patch in your box.",
   }[tab];
   const by = order ? shortDate(deliveryWindow(order.delivery, new Date(order.placedAt))[1]) : null;
   return (
@@ -1052,9 +1026,13 @@ function LockedPanel({ tab, order, setTab }) {
         <p className="mt-2 text-[15px] text-ink/70 leading-relaxed max-w-[56ch]">
           {what}{" "}
           {status === "NO_ORDER" && "Order your DS-28 to get started."}
-          {status === "IN_TRANSIT" && `Your patch should arrive by ${by}. Once it's here, unbox it and pair it in Order Tracking.`}
-          {status === "DELIVERED" && "It's arrived. Pair it in Order Tracking by typing the patch ID printed inside the box lid."}
+          {status === "IN_TRANSIT" && `Your patch should arrive by ${by}. This opens as soon as it's delivered.`}
         </p>
+        {status === "IN_TRANSIT" && (
+          <button className="btn-ghost mt-4 !border-warn/40 text-warn" onClick={() => setOrder((o) => ({ ...o, stage: STAGES.length - 1 }))}>
+            <Icon name="Wrench" size={14} />Prototype: mark as delivered
+          </button>
+        )}
         <p className="mt-4 text-[14px] text-ink/70">While you wait, you can read:</p>
         <div className="mt-3 flex flex-wrap gap-2">
           <button className="btn-ghost" onClick={() => setTab("order")}><Icon name="Package" size={14} />Order tracking</button>
@@ -1066,10 +1044,29 @@ function LockedPanel({ tab, order, setTab }) {
   );
 }
 
-/* ───────────── Tab 00 ───────────── */
-function OrderTracking({ order, setOrder, onStudio }) {
+/* ───────────── Pairing ───────────── */
+function PairForm({ order, setOrder }) {
   const [code, setCode] = useState("");
   const [err, setErr] = useState("");
+  const norm = (s) => s.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  const pair = (e) => {
+    e.preventDefault();
+    if (norm(code) !== norm(order.serial)) { setErr("That ID doesn't match this order. It's printed on the card inside the box lid."); return; }
+    setErr(""); setOrder((o) => ({ ...o, paired: true }));
+  };
+  return (
+    <form onSubmit={pair} className="mt-4 grid gap-2" noValidate>
+      <label htmlFor="pair" className="text-[13px]">Patch ID</label>
+      <input id="pair" value={code} onChange={(e) => setCode(e.target.value)} placeholder="DS28-XXX-000" autoComplete="off" aria-invalid={!!err} className={`field uppercase ${err ? "border-crit" : ""}`} />
+      {err && <p className="text-[12px] text-crit">{err}</p>}
+      <button className="btn-primary mt-1" type="submit"><Icon name="Link" size={16} />Pair patch</button>
+      <p className="text-[12px] text-mute">Prototype hint: your ID is {order.serial}.</p>
+    </form>
+  );
+}
+
+/* ───────────── Tab 00 ───────────── */
+function OrderTracking({ order, setOrder, onStudio, setTab }) {
   if (!order) {
     return (
       <Card className="p-6 sm:p-8 max-w-2xl fade-in">
@@ -1085,12 +1082,6 @@ function OrderTracking({ order, setOrder, onStudio }) {
   const [from, to] = deliveryWindow(order.delivery, new Date(order.placedAt));
   const del = DELIVERY.find((d) => d.id === order.delivery);
   const finish = findFinish(order.design.finish);
-  const norm = (s) => s.toUpperCase().replace(/[^A-Z0-9]/g, "");
-  const pair = (e) => {
-    e.preventDefault();
-    if (norm(code) !== norm(order.serial)) { setErr("That ID doesn't match this order. It's printed on the card inside the box lid."); return; }
-    setErr(""); setOrder((o) => ({ ...o, paired: true }));
-  };
   return (
     <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 fade-in">
       <Card className="lg:col-span-3 p-5 sm:p-7">
@@ -1123,20 +1114,16 @@ function OrderTracking({ order, setOrder, onStudio }) {
           <Card className="p-5 sm:p-7 border-brass/50">
             <Label>Unbox & pair</Label>
             <h2 className="mt-2 text-xl font-medium tracking-tight">Connect your patch</h2>
+            <p className="mt-2 text-[14px] text-ink/70">Your plan and setup guide are open now. Pair the patch to calibrate it and start sessions.</p>
             <p className="mt-2 text-[14px] text-ink/70">Lift out the card inside the box lid and type the patch ID printed on it.</p>
-            <form onSubmit={pair} className="mt-4 grid gap-2" noValidate>
-              <label htmlFor="pair" className="text-[13px]">Patch ID</label>
-              <input id="pair" value={code} onChange={(e) => setCode(e.target.value)} placeholder="DS28-XXX-000" autoComplete="off" aria-invalid={!!err} className={`field uppercase ${err ? "border-crit" : ""}`} />
-              {err && <p className="text-[12px] text-crit">{err}</p>}
-              <button className="btn-primary mt-1" type="submit"><Icon name="Link" size={16} />Pair patch</button>
-              <p className="text-[12px] text-mute">Prototype hint: your ID is {order.serial}.</p>
-            </form>
+            <PairForm order={order} setOrder={setOrder} />
           </Card>
         )}
         {status === "PAIRED" && (
           <Card className="p-5 sm:p-7 border-ok/40">
             <div className="flex items-center gap-2 text-ok"><Icon name="CheckCircle2" size={18} /><span className="font-medium">Patch paired</span></div>
             <p className="mt-2 text-[14px] text-ink/70">Next, prepare your skin and calibrate. It takes about four minutes.</p>
+            <button className="btn-primary mt-4" onClick={() => setTab("onboard")}>Start setup<Icon name="ArrowRight" size={16} /></button>
           </Card>
         )}
         <Card className="p-5 sm:p-7">
@@ -1219,7 +1206,15 @@ function Calibration({ order, setOrder, setTab }) {
       </Card>
 
       <Card className="lg:col-span-2 p-5 sm:p-7 flex flex-col">
-        <Label>Calibration · {node.name}</Label>
+        {!order.paired ? (
+          <>
+            <Label>Step 1 · Pair</Label>
+            <h2 className="mt-2 text-xl font-medium tracking-tight">Connect your patch</h2>
+            <p className="mt-1 text-[14px] text-ink/70 leading-relaxed">Type the patch ID from the card inside the box lid. Then you can calibrate.</p>
+            <PairForm order={order} setOrder={setOrder} />
+          </>
+        ) : (<>
+        <Label>Step 2 · Calibrate on your {node.name.toLowerCase()}</Label>
         <h2 className="mt-2 text-xl font-medium tracking-tight">Hold to calibrate</h2>
         <p className="mt-1 text-[14px] text-ink/70 leading-relaxed">Sit still, relax your jaw, and hold the ring for 3 seconds. The patch measures your baseline while you hold.</p>
         <div className="my-6 grid place-items-center">
@@ -1256,13 +1251,105 @@ function Calibration({ order, setOrder, setTab }) {
         {done && b && (
           <div className="mt-3 rounded-xl border border-line p-3 text-[13px] text-ink/80">
             Saved: steadiness {b.steadiness}%, reaction {(b.response / 1000).toFixed(2)} s, stamina {b.endurance} min.
-            <button className="ml-1 text-brass underline underline-offset-2" onClick={() => setTab("rental")}>See what it means</button>
+            <button className="ml-1 text-brass underline underline-offset-2" onClick={() => setTab("rental")}>See your updated plan</button>
           </div>
         )}
         {done && <button onClick={reset} className="mt-3 self-start btn-ghost"><Icon name="RotateCcw" size={14} />Recalibrate</button>}
+        </>)}
       </Card>
     </div>
   );
+}
+
+/* ───────────── Profile, goals and personalised plan ───────────── */
+const GOALS = [
+  { id: "craft",    name: "Woodwork and carving",              cls: "master" },
+  { id: "repair",   name: "Fine repair: watches, electronics", cls: "master" },
+  { id: "music",    name: "Playing an instrument",             cls: "virtuoso" },
+  { id: "clinical", name: "Surgical or clinical training",     cls: "virtuoso" },
+  { id: "everyday", name: "Steadier hands day to day",         cls: "base" },
+];
+const DEFAULT_GOALS = { goal: "craft", weekly: 3, budget: 30000 };
+const ORDER_CLS = ["base", "master", "virtuoso"];
+
+/* Your Neural Stream account profile, calibrated online before you ordered: a 12-minute at-home
+   test using a phone camera and screen. Prototype values come from your name and order, so they
+   stay the same for the same order. */
+function onlineProfile(order) {
+  const h = hashStr(`${order.address.name}|${order.number}`);
+  const pick = (shift, min, span) => min + ((h >>> shift) % (span + 1));
+  return {
+    source: "online",
+    at: new Date(new Date(order.placedAt).getTime() - pick(3, 6, 20) * 864e5).toISOString(),
+    steadiness: pick(0, 66, 26), response: pick(5, 185, 85), endurance: pick(10, 45, 75), fine: pick(15, 58, 36),
+    recovery: ["Quick", "Average", "Slow"][h % 3],
+  };
+}
+/* The patch's own reading replaces the online estimate once you've set it up. */
+function currentProfile(order) {
+  const online = onlineProfile(order);
+  return order.baseline ? { ...online, ...order.baseline, source: "patch", onlineAt: online.at } : online;
+}
+
+/* Every rule is returned with its result so the screen can show exactly why. */
+function recommend(p, history, node, goals) {
+  const mins = logged(history), sessions = history.length;
+  const checks = {
+    base: [{ ok: true, text: "Open to everyone, at any wearing spot" }],
+    master: [
+      { ok: p.steadiness >= 70, text: `Steadiness 70% or more (you: ${p.steadiness}%)` },
+      { ok: p.fine >= 75 || mins >= 300, text: p.fine >= 75 ? `Fine control 75% or more (you: ${p.fine}%)` : `Fine control 75%+ (you: ${p.fine}%) or 5 h logged (you: ${fmtH(mins)})` },
+      { ok: node !== "neck", text: `Worn on temple or forearm (you: ${NODES[node].name.toLowerCase()})` },
+    ],
+    virtuoso: [
+      { ok: mins >= 2400, text: `40 h of streaming logged (you: ${fmtH(mins)})` },
+      { ok: p.steadiness >= 82, text: `Steadiness 82% or more (you: ${p.steadiness}%)` },
+      { ok: p.response <= 220, text: `Reaction 0.22 s or quicker (you: ${(p.response / 1000).toFixed(2)} s)` },
+      { ok: node === "temple", text: `Worn on the temple (you: ${NODES[node].name.toLowerCase()})` },
+    ],
+  };
+  const ready = Object.fromEntries(Object.entries(checks).map(([k, v]) => [k, v.every((c) => c.ok)]));
+  const goal = GOALS.find((g) => g.id === goals.goal) || GOALS[0];
+  // Aim for the class your goal needs; if you're not ready yet, step down to the best one you are ready for.
+  let cls = goal.cls;
+  while (!ready[cls]) cls = ORDER_CLS[ORDER_CLS.indexOf(cls) - 1];
+  const stepDown = cls !== goal.cls;
+
+  const cap = Math.max(30, Math.floor((p.endurance * 2) / 15) * 15);
+  const firstCap = p.recovery === "Slow" ? 45 : 60;
+  const first = sessions < 3;
+  const minutes = Math.min(first ? firstCap : 180, cap);
+  const length = [
+    { ok: true, text: `No more than twice your stamina (${p.endurance} min): ${fmtH(cap)}` },
+    { ok: !first, text: first ? `First 3 sessions are capped at ${fmtH(firstCap)}${p.recovery === "Slow" ? " because your recovery is slow" : ""} (you've done ${sessions})` : "Past your first 3 sessions" },
+  ];
+
+  // Four-week build-up: start shorter, grow toward your stamina limit.
+  const steady = Math.min(cap, 180);
+  const weeks = [Math.min(45, minutes), minutes, Math.min(steady, Math.max(minutes, 75)), Math.min(steady, Math.max(minutes, 90))]
+    .map((m, i) => ({ week: i + 1, sessions: goals.weekly, minutes: m }));
+  const monthHours = weeks.reduce((a, w) => a + (w.sessions * w.minutes) / 60, 0);
+
+  // Pay per hour vs monthly plan, then check the budget.
+  const c = CLASSES[cls];
+  const payg = monthHours * c.fee;
+  const planCost = c.monthly + Math.max(0, monthHours - PLAN_HOURS) * c.fee;
+  const billing = planCost < payg ? "monthly" : "hourly";
+  const cost = Math.min(payg, planCost);
+  const withinBudget = cost <= goals.budget;
+  const billingWhy = [
+    { ok: true, text: `You'd stream about ${monthHours.toFixed(1)} h in your first month (${goals.weekly} sessions a week, building up)` },
+    { ok: billing === "monthly", text: `Monthly plan ${inr(planCost)} vs pay per hour ${inr(payg)}: ${billing === "monthly" ? "the plan is cheaper" : `pay per hour is cheaper until about ${(c.monthly / c.fee).toFixed(1)} h a month`}` },
+    { ok: withinBudget, text: withinBudget ? `Fits your budget of ${inr(goals.budget)} a month` : `${inr(cost)} is over your ${inr(goals.budget)} budget` },
+  ];
+  // If it doesn't fit, suggest how many sessions a week would.
+  const costAt = (n, k = c) => Math.min(weeks.reduce((a, w) => a + (n * w.minutes) / 60, 0) * k.fee, k.monthly);
+  let fitWeekly = goals.weekly;
+  while (fitWeekly > 1 && costAt(fitWeekly) > goals.budget) fitWeekly--;
+  const fits = costAt(fitWeekly) <= goals.budget;
+  const baseCost = costAt(goals.weekly, CLASSES.base);
+
+  return { cls, goal, stepDown, minutes, checks, ready, length, weeks, monthHours, billing, payg, planCost, cost, withinBudget, billingWhy, fitWeekly, fits, minCost: costAt(1), baseCost, mins, sessions };
 }
 
 /* ───────────── Tab 02 ───────────── */
@@ -1287,62 +1374,134 @@ const Spark = ({ values }) => (
 const Rule = ({ ok, text }) => (
   <li className="flex gap-2 text-[13px]"><Icon name={ok ? "CheckCircle2" : "Circle"} size={15} className={`mt-0.5 shrink-0 ${ok ? "text-ok" : "text-mute"}`} /><span className={ok ? "text-ink/85" : "text-mute"}>{text}</span></li>
 );
+const day = (iso) => new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
 
-function SkillProfile({ order, rec, live, setTab }) {
-  const b = order.baseline;
+function ProfileCard({ order, profile, live }) {
   const signals = useLiveSignals(live);
-  if (!b) {
-    return (
-      <Card className="p-5 sm:p-7">
-        <Label>Skill calibration profile</Label>
-        <h2 className="mt-2 text-xl font-medium tracking-tight">No baseline yet</h2>
-        <p className="mt-2 text-[14px] text-ink/70 max-w-[60ch]">Your recommendations come from a baseline your patch measures during calibration. Calibrate once and this section fills in.</p>
-        <button className="btn-primary mt-4" onClick={() => setTab("onboard")}>Calibrate now<Icon name="ArrowRight" size={16} /></button>
-      </Card>
-    );
-  }
+  const paired = statusOf(order) === "PAIRED";
+  const p = profile;
   const tiles = [
-    ["Steadiness", `${b.steadiness}%`, b.steadiness, "How much of the 3-second hold your hand stayed still", b.steadiness >= 82 ? "Very steady" : b.steadiness >= 70 ? "Steady" : "Building up"],
-    ["Reaction", `${(b.response / 1000).toFixed(2)} s`, Math.max(0, 100 - (b.response - 150)), "Time from deciding to move to your muscle moving", b.response <= 220 ? "Quick" : "Average"],
-    ["Stamina", `${b.endurance} min`, Math.min(100, b.endurance / 1.2), "How long your muscles stay fresh before they tire, estimated from the hold", b.endurance >= 90 ? "Long" : b.endurance >= 60 ? "Good" : "Short"],
+    ["Steadiness", `${p.steadiness}%`, p.steadiness, "How still your hand stays when you hold it out", p.steadiness >= 82 ? "Very steady" : p.steadiness >= 70 ? "Steady" : "Building up"],
+    ["Fine control", `${p.fine}%`, p.fine, "How precisely you place small movements", p.fine >= 75 ? "Precise" : "Developing"],
+    ["Reaction", `${(p.response / 1000).toFixed(2)} s`, Math.max(0, 100 - (p.response - 150)), "Time from deciding to move to your muscle moving", p.response <= 220 ? "Quick" : "Average"],
+    ["Stamina", `${p.endurance} min`, Math.min(100, p.endurance / 1.2), "How long your muscles stay fresh before they tire", p.endurance >= 90 ? "Long" : p.endurance >= 60 ? "Good" : "Short"],
   ];
   return (
     <Card className="p-5 sm:p-7">
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
         <div className="lg:col-span-3">
-          <Label>Skill calibration profile</Label>
-          <h2 className="mt-2 text-xl font-medium tracking-tight">Your baseline</h2>
-          <p className="mt-1 text-[13px] text-mute">Measured by your patch on your {NODES[b.node].name.toLowerCase()} during setup, {new Date(b.at).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}. Set up again any time to re-measure.</p>
-          <div className="mt-4 grid sm:grid-cols-3 gap-2">
+          <Label>Your profile</Label>
+          <h2 className="mt-2 text-xl font-medium tracking-tight">{order.address.name.split(" ")[0]}'s motor profile</h2>
+          {p.source === "patch" ? (
+            <p className="mt-1 text-[13px] text-mute">Measured by your patch on your {NODES[p.node].name.toLowerCase()} on {day(p.at)}. It replaced the estimate from your online check on {day(p.onlineAt)}.</p>
+          ) : (
+            <p className="mt-1 text-[13px] text-mute">From your online check on {day(p.at)}: a 12-minute test at home with your phone (a hold-still test, a tapping test and a reaction game). Your patch fine-tunes these numbers when you set it up.</p>
+          )}
+          <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2">
             {tiles.map(([k, v, pct, how, word]) => (
               <div key={k} className="rounded-xl border border-line bg-slate0 p-3">
-                <div className="flex justify-between text-[12px] text-mute"><span>{k}</span><span className="text-ink/80">{word}</span></div>
-                <div className="mt-1 text-[20px] font-medium tnum">{v}</div>
+                <div className="text-[12px] text-mute">{k}</div>
+                <div className="mt-1 text-[19px] font-medium tnum">{v}</div>
+                <div className="text-[12px] text-ink/80">{word}</div>
                 <div className="mt-2 h-1 rounded-full bg-line overflow-hidden"><div className="h-full bg-brass" style={{ width: `${pct}%` }} /></div>
-                <p className="mt-2 text-[12px] text-mute leading-snug">{how}</p>
+                <p className="mt-2 text-[11.5px] text-mute leading-snug">{how}</p>
               </div>
             ))}
           </div>
-          <p className="mt-3 text-[13px] text-mute">Streaming history: {rec.sessions} session{rec.sessions === 1 ? "" : "s"}, {fmtH(rec.mins)} logged.</p>
+          <p className="mt-3 text-[13px] text-mute">Recovery after effort: <span className="text-ink/85">{p.recovery}</span> · Streaming so far: {(order.history || []).length} sessions, {fmtH(logged(order.history))}</p>
         </div>
         <div className="lg:col-span-2">
           <Label>Right now</Label>
-          <div className="mt-3 rounded-xl border border-line bg-slate0 p-3">
-            <div className="flex justify-between text-[13px]"><span className="text-mute">Muscle movement</span><span className="tnum">{Math.round(signals.activity[signals.activity.length - 1])}%</span></div>
-            <Spark values={signals.activity} />
-            <div className="mt-3 flex justify-between text-[13px]"><span className="text-mute">Skin contact</span><span className="text-ok">{signals.contact >= 90 ? "Good" : "Fair"} · {signals.contact}%</span></div>
-            <div className="mt-1.5 flex justify-between text-[13px]"><span className="text-mute">Connection</span><span>{signals.quality >= 92 ? "Strong" : "Good"}</span></div>
+          {paired ? (
+            <>
+              <div className="mt-3 rounded-xl border border-line bg-slate0 p-3">
+                <div className="flex justify-between text-[13px]"><span className="text-mute">Muscle movement</span><span className="tnum">{Math.round(signals.activity[signals.activity.length - 1])}%</span></div>
+                <Spark values={signals.activity} />
+                <div className="mt-3 flex justify-between text-[13px]"><span className="text-mute">Skin contact</span><span className="text-ok">{signals.contact >= 90 ? "Good" : "Fair"}</span></div>
+                <div className="mt-1.5 flex justify-between text-[13px]"><span className="text-mute">Connection</span><span>{signals.quality >= 92 ? "Strong" : "Good"}</span></div>
+              </div>
+              <p className="mt-2 text-[12px] text-mute">{live ? "A skill is running, so your muscles are busier." : "Your muscles at rest, read by your patch."}</p>
+            </>
+          ) : (
+            <div className="mt-3 rounded-xl border border-dashed border-line p-4 text-[13px] text-mute">Live readings appear here once your patch is paired.</div>
+          )}
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function GoalsCard({ goals, setGoals }) {
+  return (
+    <Card className="p-5 sm:p-7">
+      <Label>Your goals</Label>
+      <h2 className="mt-2 text-xl font-medium tracking-tight">What do you want to get better at?</h2>
+      <div className="mt-4 grid gap-2" role="radiogroup" aria-label="Goal">
+        {GOALS.map((g) => (
+          <button key={g.id} role="radio" aria-checked={goals.goal === g.id} onClick={() => setGoals({ goal: g.id })}
+            className={`rounded-xl border px-3 py-2.5 text-left text-[14px] transition-colors ${goals.goal === g.id ? "border-brass/60 bg-slate0 text-ink" : "border-line text-ink/75 hover:text-ink"}`}>
+            {g.name}<span className="ml-2 text-[12px] text-mute">· {CLASSES[g.cls].name}</span>
+          </button>
+        ))}
+      </div>
+      <div className="mt-5 flex items-baseline justify-between"><label htmlFor="weekly" className="text-[13px] text-mute">Sessions a week</label><span className="text-[15px] text-brass tnum">{goals.weekly}</span></div>
+      <input id="weekly" type="range" min="1" max="7" value={goals.weekly} onChange={(e) => setGoals({ weekly: +e.target.value })} className="mt-3" style={{ "--pct": `${((goals.weekly - 1) / 6) * 100}%` }} />
+      <div className="mt-5 flex items-baseline justify-between"><label htmlFor="budget" className="text-[13px] text-mute">Monthly budget</label><span className="text-[15px] text-brass tnum">{inr(goals.budget)}</span></div>
+      <input id="budget" type="range" min="2000" max="150000" step="1000" value={goals.budget} onChange={(e) => setGoals({ budget: +e.target.value })} className="mt-3" style={{ "--pct": `${((goals.budget - 2000) / 148000) * 100}%` }} />
+    </Card>
+  );
+}
+
+function PlanCard({ rec, onUse }) {
+  const c = CLASSES[rec.cls];
+  return (
+    <Card className="p-5 sm:p-7 border-brass/40">
+      <Label>Your personalised plan</Label>
+      <div className="mt-2 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 className="text-2xl font-medium tracking-tight">{c.name}</h2>
+          <p className="mt-1 text-[14px] text-ink/75">{rec.goal.name} · {rec.weeks[0].sessions} sessions a week · {rec.billing === "monthly" ? "Monthly plan" : "Pay per hour"}</p>
+        </div>
+        <div className="text-right">
+          <div className="text-[24px] font-medium tnum">{inr(rec.cost)}</div>
+          <div className="text-[12px] text-mute">first month{rec.billing === "monthly" ? `, ${PLAN_HOURS} h included` : ""}</div>
+        </div>
+      </div>
+      {rec.stepDown && (
+        <p className="mt-3 rounded-xl bg-slate0 p-3 text-[13px] text-ink/80">
+          Your goal needs <span className="text-brass">{CLASSES[rec.goal.cls].name}</span>. You aren't ready for it yet (see the checklist below), so you start on {c.name} and build towards it.
+        </p>
+      )}
+
+      <div className="mt-5 grid grid-cols-2 sm:grid-cols-4 gap-2">
+        {rec.weeks.map((w) => (
+          <div key={w.week} className="rounded-xl border border-line bg-slate0 p-3">
+            <div className="text-[12px] text-mute">Week {w.week}</div>
+            <div className="mt-1 text-[15px] font-medium tnum">{w.sessions} × {fmtH(w.minutes)}</div>
+            <div className="text-[12px] text-mute">rest {fmtH(w.minutes * c.mult)} after each</div>
           </div>
-          <p className="mt-2 text-[12px] text-mute">{live ? "A skill is running, so your muscles are busier." : "Your muscles at rest, read by your patch."}</p>
+        ))}
+      </div>
+
+      <div className="mt-5 grid sm:grid-cols-2 gap-5">
+        <div>
+          <div className="text-[14px] font-medium">Why this length</div>
+          <ul className="mt-2 grid gap-1.5">{rec.length.map((r) => <Rule key={r.text} {...r} />)}</ul>
+        </div>
+        <div>
+          <div className="text-[14px] font-medium">Why {rec.billing === "monthly" ? "a monthly plan" : "pay per hour"}</div>
+          <ul className="mt-2 grid gap-1.5">{rec.billingWhy.map((r) => <Rule key={r.text} {...r} />)}</ul>
+          {!rec.withinBudget && (
+            <p className="mt-2 text-[13px] text-warn">
+              {rec.fits
+                ? `To stay within budget, try ${rec.fitWeekly} session${rec.fitWeekly === 1 ? "" : "s"} a week.`
+                : `Even 1 session a week costs ${inr(rec.minCost)}. ${rec.cls !== "base" ? `Base Motor at your pace would be ${inr(rec.baseCost)}, or ` : ""}raise your budget.`}
+            </p>
+          )}
         </div>
       </div>
 
-      <div className="mt-6 border-t border-line pt-5 grid lg:grid-cols-4 gap-5">
-        <div>
-          <Label>Recommended for you</Label>
-          <div className="mt-2 text-[18px] font-medium">{CLASSES[rec.cls].name}</div>
-          <div className="text-[14px] text-ink/70">{fmtH(rec.minutes)} sessions</div>
-        </div>
+      <div className="mt-5 border-t border-line pt-5 grid sm:grid-cols-3 gap-4">
         {Object.entries(rec.checks).map(([k, rules]) => (
           <div key={k}>
             <div className="flex items-center gap-2 text-[14px] font-medium">{CLASSES[k].name}
@@ -1352,40 +1511,34 @@ function SkillProfile({ order, rec, live, setTab }) {
           </div>
         ))}
       </div>
-      <ul className="mt-4 grid gap-1.5 rounded-xl bg-slate0 p-3">
-        <li className="text-[13px] text-ink/80">Why {fmtH(rec.minutes)}:</li>
-        {rec.length.map((r) => <Rule key={r.text} {...r} />)}
-      </ul>
+      <button className="btn-primary mt-5" onClick={onUse}><Icon name="Check" size={16} />Use this plan below</button>
     </Card>
   );
 }
 
 function Rental({ order, setOrder, setTab }) {
-  const b = order.baseline;
+  const profile = currentProfile(order);
+  const goals = order.goals || DEFAULT_GOALS;
+  const setGoals = (patch) => setOrder((o) => ({ ...o, goals: { ...(o.goals || DEFAULT_GOALS), ...patch } }));
   const history = order.history || [];
-  const rec = b ? recommend(b, history, order.design.node) : null;
-  const [cls, setCls] = useState(rec ? rec.cls : "base");
-  const [mins, setMins] = useState(rec ? rec.minutes : 60);
-  const [weekly, setWeekly] = useState(3);
-  const [billing, setBilling] = useState("hourly");
+  const rec = recommend(profile, history, order.design.node, goals);
+  const [cls, setCls] = useState(rec.cls);
+  const [mins, setMins] = useState(rec.minutes);
+  const [billing, setBilling] = useState(rec.billing);
   const [now, setNow] = useState(Date.now());
   useEffect(() => { const id = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(id); }, []);
+  const status = statusOf(order);
+  const ready = status === "PAIRED" && order.calibrated;
 
   const c = CLASSES[cls];
   const cooldown = mins * c.mult;
   const score = Math.min(100, Math.round((mins / 480) * 55 * c.risk + (c.risk > 2 ? 12 : 0)));
   const band = score < 34 ? { k: "Low", col: "#4ADE80", note: "Comfortable for most people. No extra steps needed." }
-            : score < 67 ? { k: "Medium", col: "#F5B84B", note: "Do the 5-minute hand reset afterwards, and don't drive during rest time." }
-            : { k: "High", col: "#F87171", note: "Needs someone with you, and three days off before the next Virtuoso stream." };
+            : score < 67 ? { k: "Medium", col: "#F5B84B", note: "Do the 5-minute hand reset afterwards, and don't drive while resting." }
+            : { k: "High", col: "#F87171", note: "Have someone with you, and take three days off before the next Virtuoso session." };
   const pct = ((mins - 30) / (480 - 30)) * 100;
-  const resumeStr = new Date(Date.now() + (mins + cooldown) * 60000).toLocaleString("en-IN", { weekday: "short", hour: "numeric", minute: "2-digit" });
-
-  // Plan maths: monthly hours you expect, pay-as-you-go cost, and the plan's break-even.
-  const monthHours = (weekly * mins * 4.3) / 60;
-  const payg = monthHours * c.fee;
-  const breakEven = c.monthly / c.fee;
-  const planBetter = monthHours >= breakEven && monthHours <= PLAN_HOURS;
   const sessionCost = billing === "monthly" ? 0 : (c.fee * mins) / 60;
+  const resumeStr = new Date(Date.now() + (mins + cooldown) * 60000).toLocaleString("en-IN", { weekday: "short", hour: "numeric", minute: "2-digit" });
 
   const s = order.session;
   const live = s && now < s.ends;
@@ -1396,109 +1549,97 @@ function Rental({ order, setOrder, setTab }) {
   const start = () => { const t = Date.now(); setOrder((o) => ({ ...o, session: { cls, mins, starts: t, ends: t + mins * 60000, rests: t + (mins + cooldown) * 60000 } })); };
   const stop = () => { const t = Date.now(); const streamed = Math.max(1, (t - s.starts) / 60000); setOrder((o) => ({ ...o, session: { ...o.session, ends: t, rests: t + streamed * CLASSES[s.cls].mult * 60000 } })); };
   const left = (ms) => fmtH(Math.max(0, Math.ceil(ms / 60000)));
-  const virtuosoBlocked = rec && !rec.ready.virtuoso;
+  const usePlan = () => {
+    setCls(rec.cls); setMins(rec.minutes); setBilling(rec.billing);
+    document.getElementById("configure")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
 
   return (
     <div className="grid gap-4 fade-in">
-      <SkillProfile order={order} rec={rec || { sessions: 0, mins: 0 }} live={!!live} setTab={setTab} />
-      {b && (
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-          <Card className="lg:col-span-2 p-5 sm:p-7">
-            <Label>Plan a stream</Label>
-            <h2 className="mt-2 text-2xl font-medium tracking-tight">Configure a stream</h2>
-            <div className="mt-5 grid gap-2" role="radiogroup" aria-label="Skill class">
-              {Object.entries(CLASSES).map(([k, v]) => {
-                const blocked = k === "virtuoso" && virtuosoBlocked;
-                return (
-                  <button key={k} role="radio" aria-checked={cls === k} disabled={blocked || live} onClick={() => setCls(k)}
-                    className={`rounded-xl border p-3 text-left transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${cls === k ? "border-brass/60 bg-slate0" : "border-line hover:bg-slate0/60"}`}>
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-medium text-[15px]">{v.name}</span>
-                      <span className="text-[13px] tnum">{inr(v.fee)}<span className="text-mute">/h</span></span>
-                    </div>
-                    <div className="mt-1 flex flex-wrap gap-1.5">
-                      {rec.cls === k && <span className="rounded-full bg-brass/15 text-brass px-2 py-0.5 text-[11px]">Recommended</span>}
-                      {blocked && <span className="rounded-full border border-line px-2 py-0.5 text-[11px] text-mute">Locked until every rule above passes</span>}
-                    </div>
-                    <p className="mt-1.5 text-[12px] text-mute leading-relaxed">{v.desc}</p>
-                  </button>
-                );
-              })}
-            </div>
-            <div className="mt-6 flex items-baseline justify-between">
-              <label htmlFor="duration" className="text-[13px] text-mute">Session length</label>
-              <span className="text-[15px] text-brass tnum">{fmtH(mins)}</span>
-            </div>
-            <input id="duration" type="range" min="30" max="480" step="15" value={mins} disabled={live} onChange={(e) => setMins(+e.target.value)} className="mt-4" style={{ "--pct": `${pct}%` }} />
-            <div className="mt-2 flex justify-between text-[12px] text-mute"><span>30 min</span><span>4 h</span><span>8 h</span></div>
-            {mins > rec.minutes && <p className="mt-2 text-[12px] text-warn">Longer than recommended for you ({fmtH(rec.minutes)}).</p>}
-          </Card>
+      <ProfileCard order={order} profile={profile} live={!!live} />
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 items-start">
+        <div className="lg:col-span-2"><GoalsCard goals={goals} setGoals={setGoals} /></div>
+        <div className="lg:col-span-3"><PlanCard rec={rec} onUse={usePlan} /></div>
+      </div>
 
-          <div className="lg:col-span-3 grid gap-4 content-start">
-            <Card className="p-5 sm:p-7">
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div>
-                  <Label>Pay per hour or monthly</Label>
-                  <div className="mt-3 grid grid-cols-2 gap-1 rounded-xl border border-line bg-slate0 p-1 w-fit">
-                    {[["hourly", "Per hour"], ["monthly", "Monthly plan"]].map(([id, label]) => (
-                      <button key={id} onClick={() => setBilling(id)} disabled={live} aria-pressed={billing === id}
-                        className={`rounded-lg px-4 py-1.5 text-[13px] ${billing === id ? "bg-brass text-slate0 font-medium" : "text-mute hover:text-ink"}`}>{label}</button>
-                    ))}
+      <div id="configure" className="grid grid-cols-1 lg:grid-cols-5 gap-4 scroll-mt-20">
+        <Card className="lg:col-span-2 p-5 sm:p-7">
+          <Label>Start a session</Label>
+          <h2 className="mt-2 text-2xl font-medium tracking-tight">Choose a skill</h2>
+          <div className="mt-5 grid gap-2" role="radiogroup" aria-label="Skill">
+            {Object.entries(CLASSES).map(([k, v]) => {
+              const blocked = !rec.ready[k];
+              return (
+                <button key={k} role="radio" aria-checked={cls === k} disabled={blocked || live} onClick={() => setCls(k)}
+                  className={`rounded-xl border p-3 text-left transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${cls === k ? "border-brass/60 bg-slate0" : "border-line hover:bg-slate0/60"}`}>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-medium text-[15px]">{v.name}</span>
+                    <span className="text-[13px] tnum">{inr(v.fee)}<span className="text-mute">/h</span> · {inr(v.monthly)}<span className="text-mute">/mo</span></span>
                   </div>
-                </div>
-                <label className="text-[13px] text-mute">
-                  Sessions a week: <span className="text-ink tnum">{weekly}</span>
-                  <input type="range" min="1" max="7" value={weekly} onChange={(e) => setWeekly(+e.target.value)} className="mt-3 w-40 block" style={{ "--pct": `${((weekly - 1) / 6) * 100}%` }} />
-                </label>
-              </div>
-              <div className="mt-4 grid sm:grid-cols-3 gap-2 text-[13px]">
-                <div className="rounded-xl border border-line bg-slate0 p-3"><div className="text-mute">You'd stream</div><div className="mt-1 text-[16px] tnum">{monthHours.toFixed(1)} h/month</div></div>
-                <div className="rounded-xl border border-line bg-slate0 p-3"><div className="text-mute">Per hour would cost</div><div className="mt-1 text-[16px] tnum">{inr(payg)}</div></div>
-                <div className="rounded-xl border border-line bg-slate0 p-3"><div className="text-mute">Monthly plan</div><div className="mt-1 text-[16px] tnum">{inr(c.monthly)}</div><div className="text-mute">up to {PLAN_HOURS} h</div></div>
-              </div>
-              <p className="mt-3 text-[13px] text-ink/80">
-                <span className="text-brass">{planBetter ? "Monthly plan recommended. " : "Pay per hour recommended. "}</span>
-                The plan pays off from {breakEven.toFixed(1)} h a month (₹{c.monthly.toLocaleString("en-IN")} ÷ {inr(c.fee)}/h){monthHours > PLAN_HOURS ? `, but you'd go over its ${PLAN_HOURS} h limit` : ""}; you'd stream {monthHours.toFixed(1)} h.
-              </p>
-            </Card>
-
-            <Card className="p-5 sm:p-7">
-              <div className="grid sm:grid-cols-3 gap-4">
-                <div><Label>This session</Label><div className="mt-2 text-[28px] font-light tnum">{billing === "monthly" ? "Included" : inr(sessionCost)}</div></div>
-                <div><Label>Rest afterwards</Label><div className="mt-2 text-[28px] font-light tnum">{fmtH(cooldown)}</div></div>
-                <div><Label>Strain</Label><div className="mt-2 text-[28px] font-light" style={{ color: band.col }}>{band.k}</div></div>
-              </div>
-              <div className="mt-5 flex h-3 w-full overflow-hidden rounded-full bg-slate0">
-                <div className="bg-brass transition-all duration-500" style={{ width: `${100 / (1 + c.mult)}%` }} title="Stream" />
-                <div className="bg-mute/40 transition-all duration-500" style={{ width: `${(100 * c.mult) / (1 + c.mult)}%` }} title="Rest" />
-              </div>
-              <p className="mt-3 text-[13px] text-ink/70">{band.note} Skilled tasks pause during rest; normal movement is fine. If you start now, you're free again {resumeStr}.</p>
-
-              <div className="mt-5 border-t border-line pt-5">
-                {live ? (
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <div className="flex items-center gap-2 text-ok"><span className="pulse h-2 w-2 rounded-full bg-ok inline-block"></span><span className="font-medium">{CLASSES[s.cls].name} is streaming</span></div>
-                      <div className="mt-1 text-[13px] text-mute">{left(s.ends - now)} left</div>
-                    </div>
-                    <div className="flex gap-2">
-                      <button className="btn-ghost" onClick={stop}><Icon name="Square" size={14} />End early</button>
-                      <button className="btn-ghost text-warn" onClick={() => setOrder((o) => ({ ...o, session: { ...o.session, ends: Date.now(), rests: Date.now() + CLASSES[s.cls].mult * s.mins * 60000 } }))} title="Prototype only">Finish now (prototype)</button>
-                    </div>
+                  <div className="mt-1 flex flex-wrap gap-1.5">
+                    {rec.cls === k && <span className="rounded-full bg-brass/15 text-brass px-2 py-0.5 text-[11px]">In your plan</span>}
+                    {blocked && <span className="rounded-full border border-line px-2 py-0.5 text-[11px] text-mute">Not ready yet</span>}
                   </div>
-                ) : resting ? (
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex items-center gap-2 text-warn"><Icon name="Moon" size={16} />Resting · next stream in {left(s.rests - now)}</div>
-                    <button className="btn-ghost text-warn" onClick={() => setOrder((o) => ({ ...o, session: { ...o.session, rests: Date.now() } }))}>Skip rest (prototype)</button>
-                  </div>
-                ) : (
-                  <button className="btn-primary w-full py-3" onClick={start}><Icon name="Play" size={16} />Start {CLASSES[cls].name} · {fmtH(mins)} · {billing === "monthly" ? "plan" : inr(sessionCost)}</button>
-                )}
-              </div>
-            </Card>
+                  <p className="mt-1.5 text-[12px] text-mute leading-relaxed">{v.desc}</p>
+                </button>
+              );
+            })}
           </div>
-        </div>
-      )}
+          <div className="mt-6 flex items-baseline justify-between">
+            <label htmlFor="duration" className="text-[13px] text-mute">Session length</label>
+            <span className="text-[15px] text-brass tnum">{fmtH(mins)}</span>
+          </div>
+          <input id="duration" type="range" min="30" max="480" step="15" value={mins} disabled={live} onChange={(e) => setMins(+e.target.value)} className="mt-4" style={{ "--pct": `${pct}%` }} />
+          <div className="mt-2 flex justify-between text-[12px] text-mute"><span>30 min</span><span>4 h</span><span>8 h</span></div>
+          {mins > rec.minutes && <p className="mt-2 text-[12px] text-warn">Longer than your plan suggests ({fmtH(rec.minutes)}).</p>}
+          <div className="mt-5 grid grid-cols-2 gap-1 rounded-xl border border-line bg-slate0 p-1">
+            {[["hourly", "Pay per hour"], ["monthly", "Monthly plan"]].map(([id, label]) => (
+              <button key={id} onClick={() => setBilling(id)} disabled={live} aria-pressed={billing === id}
+                className={`rounded-lg py-2 text-[13px] ${billing === id ? "bg-brass text-slate0 font-medium" : "text-mute hover:text-ink"}`}>{label}</button>
+            ))}
+          </div>
+        </Card>
+
+        <Card className="lg:col-span-3 p-5 sm:p-7">
+          <div className="grid sm:grid-cols-3 gap-4">
+            <div><Label>This session</Label><div className="mt-2 text-[28px] font-light tnum">{billing === "monthly" ? "In plan" : inr(sessionCost)}</div></div>
+            <div><Label>Rest afterwards</Label><div className="mt-2 text-[28px] font-light tnum">{fmtH(cooldown)}</div></div>
+            <div><Label>Effort</Label><div className="mt-2 text-[28px] font-light" style={{ color: band.col }}>{band.k}</div></div>
+          </div>
+          <div className="mt-5 flex h-3 w-full overflow-hidden rounded-full bg-slate0">
+            <div className="bg-brass transition-all duration-500" style={{ width: `${100 / (1 + c.mult)}%` }} title="Session" />
+            <div className="bg-mute/40 transition-all duration-500" style={{ width: `${(100 * c.mult) / (1 + c.mult)}%` }} title="Rest" />
+          </div>
+          <p className="mt-3 text-[13px] text-ink/70">{band.note} During rest, skilled tasks pause; normal movement is fine. Start now and you're free again {resumeStr}.</p>
+
+          <div className="mt-5 border-t border-line pt-5">
+            {!ready ? (
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="flex items-center gap-2 text-[14px] text-ink/75"><Icon name="Lock" size={15} />{status === "PAIRED" ? "Calibrate your patch before your first session." : "Pair your patch to start a session."}</p>
+                <button className="btn-ghost" onClick={() => setTab("onboard")}>Go to setup<Icon name="ArrowRight" size={14} /></button>
+              </div>
+            ) : live ? (
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2 text-ok"><span className="pulse h-2 w-2 rounded-full bg-ok inline-block"></span><span className="font-medium">{CLASSES[s.cls].name} is running</span></div>
+                  <div className="mt-1 text-[13px] text-mute">{left(s.ends - now)} left</div>
+                </div>
+                <div className="flex gap-2">
+                  <button className="btn-ghost" onClick={stop}><Icon name="Square" size={14} />End early</button>
+                  <button className="btn-ghost text-warn" onClick={() => setOrder((o) => ({ ...o, session: { ...o.session, ends: Date.now(), rests: Date.now() + CLASSES[s.cls].mult * s.mins * 60000 } }))}>Finish now (prototype)</button>
+                </div>
+              </div>
+            ) : resting ? (
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2 text-warn"><Icon name="Moon" size={16} />Resting · next session in {left(s.rests - now)}</div>
+                <button className="btn-ghost text-warn" onClick={() => setOrder((o) => ({ ...o, session: { ...o.session, rests: Date.now() } }))}>Skip rest (prototype)</button>
+              </div>
+            ) : (
+              <button className="btn-primary w-full py-3" onClick={start}><Icon name="Play" size={16} />Start {c.name} · {fmtH(mins)} · {billing === "monthly" ? "in plan" : inr(sessionCost)}</button>
+            )}
+          </div>
+        </Card>
+      </div>
     </div>
   );
 }
@@ -1815,7 +1956,7 @@ function App() {
 
   const status = statusOf(order);
   const place = ({ address, delivery, pay, total }) => {
-    setOrder({ number: `NS-${100000 + Math.floor(Math.random() * 900000)}`, serial: makeSerial(design.shape.code), design: { ...design }, address, delivery, pay, total, placedAt: new Date().toISOString(), stage: 0, paired: false, calibrated: false, baseline: null, history: [], session: null });
+    setOrder({ number: `NS-${100000 + Math.floor(Math.random() * 900000)}`, serial: makeSerial(design.shape.code), design: { ...design }, address, delivery, pay, total, placedAt: new Date().toISOString(), stage: 0, paired: false, calibrated: false, baseline: null, history: [], session: null, goals: DEFAULT_GOALS });
     setTab("order"); setView("manual");
   };
   const demo = () => place({ address: { name: "Asha Rao", phone: "9876543210", street: "12B, Lake View Apartments, MG Road", area: "", city: "Pune", state: "Maharashtra", pin: "411001" }, delivery: "standard", pay: "upi", total: PRICING.kit + PRICING.shell });
@@ -1827,7 +1968,7 @@ function App() {
   };
   const closeModal = () => { setModal(false); setDrm(false); };
   const current = TABS.find((t) => t.id === tab);
-  const locked = current.needs && status !== "PAIRED";
+  const locked = current.needs && !["DELIVERED", "PAIRED"].includes(status);
 
   return (
     <>
@@ -1841,9 +1982,9 @@ function App() {
             <DevBar order={order} setOrder={setOrder} onDemo={demo} />
             <Tabs tab={tab} setTab={setTab} status={status} />
             <main className="mx-auto max-w-6xl px-4 sm:px-6 py-6" key={tab}>
-              {locked ? <LockedPanel tab={tab} order={order} setTab={setTab} /> : (
+              {locked ? <LockedPanel tab={tab} order={order} setTab={setTab} setOrder={setOrder} /> : (
                 <>
-                  {tab === "order" && <OrderTracking order={order} setOrder={setOrder} onStudio={() => setView("studio")} />}
+                  {tab === "order" && <OrderTracking order={order} setOrder={setOrder} onStudio={() => setView("studio")} setTab={setTab} />}
                   {tab === "onboard" && <Calibration order={order} setOrder={setOrder} setTab={setTab} />}
                   {tab === "rental" && <Rental order={order} setOrder={setOrder} setTab={setTab} />}
                   {tab === "map" && <AnatomyMap order={order} design={design} setOrder={setOrder} />}

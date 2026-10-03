@@ -114,8 +114,12 @@ UMD + in-browser Babel and Lucide setup). Open it directly in a browser.
   Choosing temple, neck or forearm moves the camera to frame that spot; forearm zooms out to a raised
   stand-in forearm model with the shell on its inner side.
 - **Checkout:** Indian delivery address and shipping speed in ₹.
-- **Web Manual:** calibration, skill rental and the hardware guide stay locked until the order is
-  delivered and paired; a “Prototype controls” switch simulates unboxing.
+- **Web Manual:** before delivery only Order Tracking, Where to Wear It and Safety are open.
+  Once delivered, Onboarding (pair, then calibrate), Skill Rental and Hardware open. Skill Rental
+  shows a motor profile from the buyer's online check (2035 phone-based test), replaced by the
+  patch's own reading after calibration; goals, sessions a week and budget drive a personalised plan
+  (skill class, four-week build-up, pay per hour vs monthly) with every rule shown. Starting a
+  session needs a paired, calibrated patch. Prototype controls can mark the order delivered.
 
 The head scan (“Lee Perry-Smith”, Infinite-Realities, CC BY 3.0) and its textures are embedded as
 base64. `standalone/manual-app.jsx` is the readable source of the file's app script.
