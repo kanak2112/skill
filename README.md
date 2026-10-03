@@ -104,10 +104,18 @@ for first-person video. To use real clips, add muted MP4s to `public/footage/` a
 ## Standalone Web Manual (`standalone/Neural_Stream_Manual.html`)
 
 A single self-contained HTML file built on the original diagnostic manual (same Tailwind CDN, React
-UMD + in-browser Babel and Lucide setup). Open it directly in a browser. It combines the Shape Studio
-(live Three.js head with orbit controls; describe, pick or draw a shell; colour and finish; temple,
-neck or forearm), an Indian delivery checkout in ₹, and the Web Manual. Calibration, skill rental,
-the copy-protection practice and the hardware guide stay locked until the order is delivered and
-paired; a “Prototype controls” switch simulates unboxing for testing. The head scan
-(“Lee Perry-Smith”, Infinite-Realities, CC BY 3.0) and its textures are embedded as base64.
-`standalone/manual-app.jsx` is the readable source of the file's app script.
+UMD + in-browser Babel and Lucide setup). Open it directly in a browser.
+
+- **Home:** full-screen 3D head (Three.js r147, orbit controls, slow auto-turn) with “Get yours now”,
+  which fades into the Shape Studio.
+- **Shape Studio:** describe, pick or draw a shell; colour and finish update live on the model.
+  “Upload your photo” projects a portrait onto the model's face (front projection blended into the
+  skin, with left/right, up/down and size controls); the photo stays in memory and is never saved.
+  Choosing temple, neck or forearm moves the camera to frame that spot; forearm zooms out to a raised
+  stand-in forearm model with the shell on its inner side.
+- **Checkout:** Indian delivery address and shipping speed in ₹.
+- **Web Manual:** calibration, skill rental and the hardware guide stay locked until the order is
+  delivered and paired; a “Prototype controls” switch simulates unboxing.
+
+The head scan (“Lee Perry-Smith”, Infinite-Realities, CC BY 3.0) and its textures are embedded as
+base64. `standalone/manual-app.jsx` is the readable source of the file's app script.

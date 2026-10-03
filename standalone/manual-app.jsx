@@ -83,25 +83,22 @@ function strokesToPath(strokes) {
 
 const NODES = {
   temple: {
-    name: "Temple", sku: "NS-TN-28", x: 128, y: 62, fidelity: 97,
+    name: "Temple", x: 128, y: 62, strength: "Best",
     bestFor: "Hand and face skills: writing, carving, instruments",
     helps: ["Fine finger and hand movement", "Planning a sequence of movements", "Timing between both hands"],
     place: ["Two fingers above and slightly in front of the top of your ear", "Notch pointing to the outer corner of your eye", "Clean, dry skin with hair trimmed short"],
-    tech: [["Latency", "0.8 ms"], ["Signal-to-noise", "38 dB"], ["Drift per hour", "0.04 ms"]],
   },
   neck: {
-    name: "Neck", sku: "NS-CR-40", x: 112, y: 128, fidelity: 89,
+    name: "Neck", x: 112, y: 128, strength: "Good",
     bestFor: "Posture and shoulder skills: lifting, standing work",
     helps: ["Shoulder and upper-back stability", "Holding posture while standing", "Carrying and lifting"],
     place: ["Centre of the back of your neck, two finger-widths below the skull", "Logo upright", "Clear of the sweaty hairline"],
-    tech: [["Latency", "1.4 ms"], ["Signal-to-noise", "31 dB"], ["Drift per hour", "0.11 ms"]],
   },
   forearm: {
-    name: "Forearm", sku: "NS-FA-12", x: 196, y: 262, fidelity: 93,
+    name: "Forearm", x: 196, y: 262, strength: "Very good",
     bestFor: "Grip and wrist skills: tools, suturing, pinch grip",
     helps: ["Finger bending and grip strength", "A steady wrist", "Thumb-to-finger pinch"],
     place: ["Inner forearm, a hand-width below the elbow crease", "Long edge in line with your forearm", "Snug: two fingers fit under the strap"],
-    tech: [["Latency", "1.1 ms"], ["Signal-to-noise", "35 dB"], ["Drift per hour", "0.07 ms"]],
   },
 };
 
@@ -114,7 +111,7 @@ const STATES = ["Andaman and Nicobar Islands", "Andhra Pradesh", "Arunachal Prad
 const STAGES = [
   { id: "placed", label: "Order placed", detail: "Payment confirmed" },
   { id: "printing", label: "Printing your shell", detail: "Your design is being 3D printed" },
-  { id: "qc", label: "Quality check", detail: "Patch tested and matched to your hardware ID" },
+  { id: "qc", label: "Quality check", detail: "Patch tested and matched to your patch ID" },
   { id: "shipped", label: "Shipped", detail: "With the courier" },
   { id: "out", label: "Out for delivery", detail: "Arriving today" },
   { id: "delivered", label: "Delivered", detail: "Unbox it and pair your patch" },
@@ -144,7 +141,7 @@ const CLASSES = {
 };
 const PLAN_HOURS = 20;
 
-/* Baseline the patch records during calibration. Prototype values come from the hardware ID and
+/* Baseline the patch records during calibration. Prototype values come from the patch ID and
    wearing spot, so the same patch always measures the same. */
 function measureBaseline(serial, node) {
   const h = hashStr(`${serial}:${node}`);
@@ -166,7 +163,7 @@ function recommend(b, history, node) {
     virtuoso: [
       { ok: mins >= 2400, text: `40 h of streaming logged (you: ${fmtH(mins)})` },
       { ok: b.steadiness >= 82, text: `Steadiness 82% or more (you: ${b.steadiness}%)` },
-      { ok: b.response <= 220, text: `Response 220 ms or faster (you: ${b.response} ms)` },
+      { ok: b.response <= 220, text: `Reaction 0.22 s or quicker (you: ${(b.response / 1000).toFixed(2)} s)` },
       { ok: node === "temple", text: `Worn on the temple (you: ${NODES[node].name.toLowerCase()})` },
     ],
   };
@@ -176,7 +173,7 @@ function recommend(b, history, node) {
   const first = sessions < 3;
   const minutes = Math.min(first ? 60 : 240, cap);
   const length = [
-    { ok: true, text: `Up to twice your signal endurance (${b.endurance} min): ${fmtH(cap)}` },
+    { ok: true, text: `No more than twice your stamina (${b.endurance} min): ${fmtH(cap)}` },
     { ok: !first, text: first ? `First 3 sessions are capped at 1 h (you've done ${sessions})` : "Past your first 3 sessions" },
   ];
   return { cls, minutes, checks, ready, length, mins, sessions };
@@ -250,12 +247,24 @@ const b64ToBuffer = (b64) => {
   return out.buffer;
 };
 
+/* Camera framings. `dir` is where the camera sits relative to the target; `dist` scales the base distance.
+   Temple and neck aim straight at the shell; forearm pulls back to show the raised arm. */
+const FRAMES = {
+  hero:    { target: [0, 0.1, 0],     dist: 1.05, dir: [-0.62, 0.1, 0.78] },
+  temple:  { target: [0, 0.16, 0],    dist: 1.0,  dir: "spot" },
+  neck:    { target: [0, 0.1, 0],     dist: 1.0,  dir: "spot" },
+  forearm: { target: [0.04, -0.1, 0.14], dist: 1.6, dir: [0.25, 0.22, 1] },
+  face:    { target: [0, 0.18, 0],    dist: 0.82, dir: [-0.42, 0.06, 1] },
+};
+
 /**
- * Live WebGL canvas: a scanned head with orbit controls (drag to turn 360°, scroll or pinch to
- * zoom). The shell is projected onto the skin as a decal and updates as soon as the design,
- * colour or finish changes. Head scan "Lee Perry-Smith" by Infinite-Realities, CC BY 3.0.
+ * Live WebGL canvas: a scanned head with orbit controls (drag to turn 360°, scroll or pinch to zoom),
+ * plus a raised forearm for the forearm placement. The shell is projected onto the skin as a decal.
+ * A portrait photo, if given, is projected onto the face from the front and blended into the skin,
+ * so the shell can be previewed on the buyer's own face.
+ * Head scan "Lee Perry-Smith" by Infinite-Realities, CC BY 3.0.
  */
-function HeadStage({ shape, color, coating, node, autoTurn }) {
+function HeadStage({ shape, color, coating, node, autoTurn, photo, frame }) {
   const mount = useRef(null);
   const api = useRef({});
   const [status, setStatus] = useState("loading");
@@ -270,14 +279,14 @@ function HeadStage({ shape, color, coating, node, autoTurn }) {
     renderer.physicallyCorrectLights = true;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.05;
-    renderer.domElement.setAttribute("aria-label", "3D head wearing your shell. Drag to turn, scroll or pinch to zoom.");
+    renderer.domElement.setAttribute("aria-label", "3D model wearing your shell. Drag to turn, scroll or pinch to zoom.");
     renderer.domElement.setAttribute("role", "img");
     el.appendChild(renderer.domElement);
 
     const scene = new THREE.Scene();
     const pmrem = new THREE.PMREMGenerator(renderer);
     scene.environment = pmrem.fromScene(new THREE.RoomEnvironment(), 0.04).texture;
-    const camera = new THREE.PerspectiveCamera(24, 1, 0.1, 100);
+    const camera = new THREE.PerspectiveCamera(24, 1, 0.05, 100);
     const rig = new THREE.Group();
     const key = new THREE.DirectionalLight("#ffe7cf", 2.4); key.position.set(-3, 4, 5);
     const rim = new THREE.DirectionalLight("#e2b168", 4); rim.position.set(4, 2, -5);
@@ -287,43 +296,63 @@ function HeadStage({ shape, color, coating, node, autoTurn }) {
     const glow = new THREE.PointLight("#ff2a4b", 0, 0.35, 2);
     scene.add(glow);
 
-    const target = new THREE.Vector3(0, 0.14, 0);
+    const target = new THREE.Vector3(0, 0.12, 0);
     const baseDist = () => 2.2 * Math.max(1, 0.95 / camera.aspect);
-    camera.position.set(-Math.sin(1.0) * 2.2, 0.24, Math.cos(1.0) * 2.2);
+    camera.position.set(-Math.sin(0.9) * 2.2, 0.24, Math.cos(0.9) * 2.2);
     const controls = new THREE.OrbitControls(camera, renderer.domElement);
     controls.target.copy(target);
     controls.enableDamping = true; controls.dampingFactor = 0.08;
     controls.enablePan = false; controls.rotateSpeed = 0.7;
-    controls.minPolarAngle = Math.PI * 0.3; controls.maxPolarAngle = Math.PI * 0.64;
+    controls.minPolarAngle = Math.PI * 0.25; controls.maxPolarAngle = Math.PI * 0.68;
     controls.autoRotateSpeed = -1.2;
-    let pausedUntil = 0;
+    let pausedUntil = 0, tween = null, frameName = null, frameScale = 1;
     controls.addEventListener("start", () => { pausedUntil = Infinity; tween = null; });
-    controls.addEventListener("end", () => { pausedUntil = performance.now() + 2500; });
+    controls.addEventListener("end", () => { pausedUntil = performance.now() + 3000; });
 
+    const setLimits = () => {
+      const d = baseDist() * frameScale;
+      controls.minDistance = d * 0.5; controls.maxDistance = d * 1.6;
+    };
     const resize = () => {
       const w = el.clientWidth, h = el.clientHeight;
       if (!w || !h) return;
       renderer.setSize(w, h, false);
       camera.aspect = w / h; camera.updateProjectionMatrix();
-      const d = baseDist();
-      controls.minDistance = d * 0.55; controls.maxDistance = d * 1.4;
-      const off = camera.position.clone().sub(target).setLength(d);
-      camera.position.copy(target).add(off);
+      setLimits();
+      const off = camera.position.clone().sub(controls.target).setLength(baseDist() * frameScale);
+      camera.position.copy(controls.target).add(off);
     };
     const ro = new ResizeObserver(resize); ro.observe(el); resize();
 
-    let head = null, decal = null, spots = {}, current = null, morphStart = 0, tween = null, raf = 0, disposed = false;
+    let head = null, arm = null, decal = null, spots = {}, current = null, morphStart = 0, raf = 0, disposed = false;
     const material = new THREE.MeshPhysicalMaterial({ transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, emissive: new THREE.Color("#ffffff"), emissiveIntensity: 0.5 });
 
-    // Fit the decal at a spot on the scan: cast a ray in, take the hit point and surface normal.
-    const findSpot = (from, dir, roll) => {
-      const ray = new THREE.Raycaster(from, dir.normalize());
-      const hit = ray.intersectObject(head, false)[0];
+    // Photo projection uniforms: x, y = photo centre, z = photo width, w = photo height (head units).
+    const blank = new THREE.DataTexture(new Uint8Array([0, 0, 0, 255]), 1, 1); blank.needsUpdate = true;
+    const photoU = { uPhoto: { value: blank }, uPhotoOn: { value: 0 }, uXf: { value: new THREE.Vector4(0, 0.17, 0.62, 0.78) }, uUnit: { value: 1 } };
+
+    // Move the camera (and what it looks at) to a framing, over 0.9 s.
+    const goTo = (name, spot) => {
+      const f = FRAMES[name] || FRAMES.temple;
+      frameName = name; frameScale = f.dist; setLimits();
+      const t = new THREE.Vector3(...f.target);
+      let dir;
+      if (f.dir === "spot" && spot) { dir = spot.normal.clone(); dir.y = 0.12; }
+      else dir = new THREE.Vector3(...(Array.isArray(f.dir) ? f.dir : [-0.6, 0.1, 0.8]));
+      dir.normalize();
+      tween = { fromPos: camera.position.clone(), fromTarget: controls.target.clone(), toTarget: t, toPos: t.clone().add(dir.multiplyScalar(baseDist() * f.dist)), t0: performance.now() };
+      pausedUntil = performance.now() + 6000;
+    };
+    api.current.goTo = goTo;
+
+    const findSpot = (mesh, from, dir, roll, size) => {
+      mesh.updateMatrixWorld(true);
+      const hit = new THREE.Raycaster(from, dir.normalize()).intersectObject(mesh, false)[0];
       if (!hit) return null;
-      const n = hit.face.normal.clone().transformDirection(head.matrixWorld);
+      const n = hit.face.normal.clone().transformDirection(mesh.matrixWorld);
       const helper = new THREE.Object3D();
       helper.position.copy(hit.point); helper.lookAt(hit.point.clone().add(n)); helper.rotateZ(roll);
-      const geo = new THREE.DecalGeometry(head, hit.point, helper.rotation, new THREE.Vector3(0.13, 0.13, 0.07));
+      const geo = new THREE.DecalGeometry(mesh, hit.point, helper.rotation, new THREE.Vector3(size, size, size * 0.55));
       geo.translate(-hit.point.x, -hit.point.y, -hit.point.z);
       return { point: hit.point.clone(), normal: n, geo };
     };
@@ -331,12 +360,12 @@ function HeadStage({ shape, color, coating, node, autoTurn }) {
     const apply = () => {
       const p = api.current.props;
       if (!head || !p) return;
-      const spot = spots[p.node === "neck" ? "neck" : "temple"];
+      const spot = spots[p.node];
       if (!spot) return;
       if (!decal) { decal = new THREE.Mesh(spot.geo, material); scene.add(decal); }
-      if (decal.geometry !== spot.geo) decal.geometry = spot.geo;
+      decal.geometry = spot.geo;
       decal.position.copy(spot.point);
-      decal.visible = p.node !== "forearm";
+      arm.visible = p.node === "forearm";
       const c = COATINGS.find((x) => x.id === p.coating) || COATINGS[0];
       if (material.map) material.map.dispose();
       const tex = shellCanvas(p.shape, p.color, p.coating);
@@ -347,15 +376,24 @@ function HeadStage({ shape, color, coating, node, autoTurn }) {
       glow.color.set(p.color);
       glow.position.copy(spot.point.clone().add(spot.normal.clone().multiplyScalar(0.05)));
       morphStart = performance.now();
-      if (current !== p.node) {
-        current = p.node;
-        // Swing the camera round to face the chosen spot.
-        const dir = spot.normal.clone(); dir.y = 0.12; dir.normalize();
-        tween = { from: camera.position.clone(), to: target.clone().add(dir.multiplyScalar(camera.position.distanceTo(target))), t0: performance.now() };
-        pausedUntil = performance.now() + 6000;
-      }
+      const want = p.frame || p.node;
+      if (current !== p.node || frameName !== want) { current = p.node; goTo(want, spot); }
     };
     api.current.apply = apply;
+
+    const setPhoto = (ph) => {
+      if (!ph) { photoU.uPhotoOn.value = 0; return; }
+      const w = ph.size, h = ph.size * ph.aspect;
+      photoU.uXf.value.set(ph.x, ph.y, w, h);
+      if (api.current.photoUrl !== ph.url) {
+        api.current.photoUrl = ph.url;
+        new THREE.TextureLoader().load(ph.url, (tx) => {
+          if (photoU.uPhoto.value !== blank) photoU.uPhoto.value.dispose();
+          photoU.uPhoto.value = tx; photoU.uPhotoOn.value = 1;
+        });
+      } else photoU.uPhotoOn.value = 1;
+    };
+    api.current.setPhoto = setPhoto;
 
     const head64 = window.__HEAD;
     new THREE.GLTFLoader().parse(b64ToBuffer(head64.model), "", (gltf) => {
@@ -364,66 +402,120 @@ function HeadStage({ shape, color, coating, node, autoTurn }) {
       const col = tl.load(head64.color); col.encoding = THREE.sRGBEncoding;
       const nrm = tl.load(head64.normal);
       head = gltf.scene.getObjectByProperty("type", "Mesh");
-      head.material = new THREE.MeshPhysicalMaterial({
-        map: col, normalMap: nrm, normalScale: new THREE.Vector2(0.8, 0.8), roughness: 0.52, metalness: 0,
-        sheen: 0.4, sheenRoughness: 0.6, sheenColor: new THREE.Color("#ffd7c2"), envMapIntensity: 0.35,
-      });
+      const skin = { roughness: 0.52, metalness: 0, sheen: 0.4, sheenRoughness: 0.6, sheenColor: new THREE.Color("#ffd7c2"), envMapIntensity: 0.35 };
+      head.material = new THREE.MeshPhysicalMaterial({ map: col, normalMap: nrm, normalScale: new THREE.Vector2(0.8, 0.8), ...skin });
+      // Blend the uploaded photo onto the front of the face: planar projection from the front,
+      // faded out towards the sides, hairline and jaw so it sits on the skin like a texture.
+      head.material.onBeforeCompile = (sh) => {
+        Object.assign(sh.uniforms, photoU);
+        sh.vertexShader = sh.vertexShader
+          .replace("#include <common>", "#include <common>\nvarying vec3 vObjPos;\nvarying vec3 vObjN;")
+          .replace("#include <begin_vertex>", "#include <begin_vertex>\nvObjPos = position;\nvObjN = normal;");
+        sh.fragmentShader = sh.fragmentShader
+          .replace("#include <common>", "#include <common>\nuniform sampler2D uPhoto;\nuniform float uPhotoOn;\nuniform vec4 uXf;\nuniform float uUnit;\nvarying vec3 vObjPos;\nvarying vec3 vObjN;")
+          .replace("#include <map_fragment>", `#include <map_fragment>
+            if (uPhotoOn > 0.5) {
+              vec3 p = vObjPos / uUnit;
+              vec2 puv = vec2((p.x - uXf.x) / uXf.z + 0.5, (p.y - uXf.y) / uXf.w + 0.5);
+              float inside = step(0.0, puv.x) * step(puv.x, 1.0) * step(0.0, puv.y) * step(puv.y, 1.0);
+              float facing = smoothstep(0.2, 0.65, normalize(vObjN).z);
+              float face = 1.0 - smoothstep(0.72, 1.0, length(vec2(p.x / 0.165, (p.y - 0.17) / 0.24)));
+              vec3 photoLin = pow(texture2D(uPhoto, puv).rgb, vec3(2.2));
+              diffuseColor.rgb = mix(diffuseColor.rgb, photoLin, inside * facing * face);
+            }`);
+      };
       head.geometry.computeBoundingBox();
       const box = head.geometry.boundingBox, size = box.getSize(new THREE.Vector3()), center = box.getCenter(new THREE.Vector3());
       head.geometry.translate(-center.x, -center.y, -center.z);
+      head.geometry.computeBoundingBox();
+      photoU.uUnit.value = size.y;
       head.scale.setScalar(1 / size.y); head.position.set(0, 0, 0); head.rotation.set(0, 0, 0);
       scene.add(head); head.updateMatrixWorld(true);
 
-      const cast = (o, d) => { const r = new THREE.Raycaster(o, d.normalize()); return r.intersectObject(head, false)[0]; };
+      // Raised forearm in front of the chest, inner side facing the viewer, with a simple hand.
+      const prof = [];
+      const L = 0.34;
+      prof.push(new THREE.Vector2(0.0001, -0.012));
+      for (let i = 0; i <= 24; i++) {
+        const t = i / 24;
+        const r = 0.05 + 0.008 * Math.sin(Math.min(1, t / 0.45) * Math.PI) - 0.016 * Math.max(0, (t - 0.35) / 0.65);
+        prof.push(new THREE.Vector2(r, t * L));
+      }
+      prof.push(new THREE.Vector2(0.0001, L + 0.01));
+      const fore = new THREE.Mesh(new THREE.LatheGeometry(prof, 48), new THREE.MeshPhysicalMaterial({ color: "#d7a68d", ...skin }));
+      fore.scale.set(1, 1, 0.78);
+      const hand = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 20), fore.material);
+      hand.scale.set(0.042, 0.075, 0.028); hand.position.set(0, L + 0.06, 0.004);
+      const elbow = new THREE.Mesh(new THREE.SphereGeometry(0.05, 24, 16), fore.material);
+      elbow.scale.set(1, 1, 0.78);
+      arm = new THREE.Group();
+      arm.add(fore, hand, elbow);
+      arm.position.set(0.22, -0.46, 0.26);
+      arm.rotation.set(-0.1, 0.25, 0.95);
+      arm.visible = false;
+      scene.add(arm);
+      arm.updateMatrixWorld(true);
+
+      const cast = (o, d) => new THREE.Raycaster(o, d.normalize()).intersectObject(head, false)[0];
       const browY = 0.255;
       const front = cast(new THREE.Vector3(0, browY, 3), new THREE.Vector3(0, 0, -1));
       const back = cast(new THREE.Vector3(0, browY, -3), new THREE.Vector3(0, 0, 1));
       const zT = front && back ? front.point.z - (front.point.z - back.point.z) * 0.17 : 0.1;
-      spots.temple = findSpot(new THREE.Vector3(-3, browY - 0.02, zT), new THREE.Vector3(1, 0, 0), -0.25);
-      spots.neck = findSpot(new THREE.Vector3(0, 0.02, -3), new THREE.Vector3(0, 0, 1), 0);
+      spots.temple = findSpot(head, new THREE.Vector3(-3, browY - 0.02, zT), new THREE.Vector3(1, 0, 0), -0.25, 0.13);
+      spots.neck = findSpot(head, new THREE.Vector3(0, 0.02, -3), new THREE.Vector3(0, 0, 1), 0, 0.13);
+      const mid = new THREE.Vector3(0, L * 0.55, 0).applyMatrix4(fore.matrixWorld);
+      spots.forearm = findSpot(fore, mid.clone().add(new THREE.Vector3(0, 0, 2)), new THREE.Vector3(0, 0, -1), 0.95 - Math.PI / 2, 0.1);
       setStatus("ready");
       apply();
+      setPhoto(api.current.photo);
     }, () => { if (!disposed) setStatus("error"); });
 
     const toCam = new THREE.Vector3();
     const ease = (t) => 1 - Math.pow(1 - t, 3);
-    const back = (t) => 1 + 2.2 * Math.pow(t - 1, 3) + 1.2 * Math.pow(t - 1, 2);
-    const frame = (now) => {
-      raf = requestAnimationFrame(frame);
+    const overshoot = (t) => 1 + 2.2 * Math.pow(t - 1, 3) + 1.2 * Math.pow(t - 1, 2);
+    const frameLoop = (now) => {
+      raf = requestAnimationFrame(frameLoop);
       if (tween) {
-        const t = Math.min(1, (now - tween.t0) / 900);
-        camera.position.lerpVectors(tween.from, tween.to, ease(t));
+        const t = ease(Math.min(1, (now - tween.t0) / 900));
+        controls.target.lerpVectors(tween.fromTarget, tween.toTarget, t);
+        camera.position.lerpVectors(tween.fromPos, tween.toPos, t);
         if (t >= 1) tween = null;
       }
       controls.autoRotate = !!(api.current.props && api.current.props.autoTurn) && !tween && now > pausedUntil;
       controls.update();
       rig.quaternion.copy(camera.quaternion);
-      if (decal && decal.visible && current) {
-        const spot = spots[current === "neck" ? "neck" : "temple"];
+      if (decal && current) {
+        const spot = spots[current];
         toCam.copy(camera.position).sub(spot.point).normalize();
         const facing = spot.normal.dot(toCam);
         const t = Math.min(1, (now - morphStart) / 600);
-        decal.scale.setScalar(0.35 + 0.65 * back(t));
+        decal.scale.setScalar(0.35 + 0.65 * overshoot(t));
         material.opacity = Math.min(1, t * 2.2);
         material.emissiveIntensity = 0.3 + Math.max(0, facing) * 0.3 + (1 - t) * 1.2;
         glow.intensity = Math.max(0, facing) * (0.05 + (1 - t) * 0.35);
-      } else glow.intensity = 0;
+      }
       renderer.render(scene, camera);
     };
-    raf = requestAnimationFrame(frame);
+    raf = requestAnimationFrame(frameLoop);
 
     return () => {
       disposed = true; cancelAnimationFrame(raf); ro.disconnect(); controls.dispose();
       scene.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) [].concat(o.material).forEach((m) => m.dispose()); });
       Object.values(spots).forEach((s) => s && s.geo.dispose());
+      if (photoU.uPhoto.value) photoU.uPhoto.value.dispose();
       pmrem.dispose(); renderer.dispose(); renderer.domElement.remove();
     };
   }, []);
 
   useEffect(() => {
-    api.current.props = { shape, color, coating, node, autoTurn };
+    api.current.props = { shape, color, coating, node, autoTurn, frame };
     if (api.current.apply) api.current.apply();
-  }, [shape, color, coating, node, autoTurn]);
+  }, [shape, color, coating, node, autoTurn, frame]);
+
+  useEffect(() => {
+    api.current.photo = photo;
+    if (api.current.setPhoto) api.current.setPhoto(photo);
+  }, [photo]);
 
   return (
     <div ref={mount} className="absolute inset-0 cursor-grab active:cursor-grabbing [&>canvas]:block [&>canvas]:h-full [&>canvas]:w-full">
@@ -432,7 +524,7 @@ function HeadStage({ shape, color, coating, node, autoTurn }) {
         <div className="absolute inset-0 grid place-items-center text-center p-6">
           <div>
             <Shell shape={shape} color={color} coating={coating} size={140} className="mx-auto" />
-            <p className="mt-4 text-[13px] text-mute">3D preview needs WebGL. Your shell is shown flat instead.</p>
+            <p className="mt-4 text-[13px] text-mute">The 3D preview needs WebGL. Your shell is shown flat instead.</p>
           </div>
         </div>
       )}
@@ -440,41 +532,74 @@ function HeadStage({ shape, color, coating, node, autoTurn }) {
   );
 }
 
+
 /* ───────────── Header ───────────── */
 function statusOf(order) {
   if (!order) return "NO_ORDER";
   if (order.paired) return "PAIRED";
   return order.stage >= STAGES.length - 1 ? "DELIVERED" : "IN_TRANSIT";
 }
-function Header({ view, setView, order }) {
+function Header({ view, setView, order, overlay }) {
   const status = statusOf(order);
   const node = order ? NODES[order.design.node] : null;
   const VIEWS = [["studio", "Shape Studio"], ["checkout", "Checkout"], ["manual", "Web Manual"]];
-  let pill;
-  if (status === "PAIRED") pill = <span className="flex items-center gap-2 rounded-full border border-ok/30 bg-ok/10 px-3 py-1.5 text-ok"><span className="pulse h-2 w-2 rounded-full bg-ok inline-block"></span>Patch connected <span className="text-ok/70">· {node.name}</span></span>;
-  else if (status === "DELIVERED") pill = <span className="flex items-center gap-2 rounded-full border border-warn/30 bg-warn/10 px-3 py-1.5 text-warn"><Icon name="PackageOpen" size={14} />Delivered · pair your patch</span>;
-  else if (status === "IN_TRANSIT") pill = <span className="flex items-center gap-2 rounded-full border border-line px-3 py-1.5 text-mute"><Icon name="Truck" size={14} />{STAGES[order.stage].label} · arrives {shortDate(deliveryWindow(order.delivery, new Date(order.placedAt))[1])}</span>;
-  else pill = <span className="flex items-center gap-2 rounded-full border border-line px-3 py-1.5 text-mute"><Icon name="ShoppingBag" size={14} />No order yet</span>;
+  let pill = null;
+  if (status === "PAIRED") pill = <span className="flex items-center gap-2 rounded-full border border-ok/30 bg-ok/10 px-3 py-1.5 text-ok"><span className="pulse h-2 w-2 rounded-full bg-ok inline-block"></span>Patch connected · {node.name}</span>;
+  else if (status === "DELIVERED") pill = <span className="flex items-center gap-2 rounded-full border border-warn/30 bg-warn/10 px-3 py-1.5 text-warn"><Icon name="PackageOpen" size={14} />Delivered · ready to set up</span>;
+  else if (status === "IN_TRANSIT") pill = <span className="flex items-center gap-2 rounded-full border border-line px-3 py-1.5 text-mute"><Icon name="Truck" size={14} />Arrives {shortDate(deliveryWindow(order.delivery, new Date(order.placedAt))[1])}</span>;
   return (
-    <header className="sticky z-40 border-b border-line bg-slate0/90 backdrop-blur" style={{ top: "env(safe-area-inset-top, 0px)" }}>
+    <header className={`${overlay ? "absolute inset-x-0 top-0 bg-gradient-to-b from-slate0/80 to-transparent" : "sticky border-b border-line bg-slate0/90 backdrop-blur"} z-40`} style={{ top: "env(safe-area-inset-top, 0px)" }}>
       <div className="mx-auto max-w-6xl px-4 sm:px-6 py-3 flex flex-wrap items-center gap-x-6 gap-y-2 justify-between">
-        <button className="flex items-center gap-3 min-w-0" onClick={() => setView("studio")}>
+        <button className="flex items-center gap-3 min-w-0" onClick={() => setView("home")} aria-label="Neural Stream DS-28 home">
           <div className="h-8 w-8 rounded-full border border-brass/50 grid place-items-center text-brass shrink-0"><Icon name="Waves" size={16} /></div>
           <span className="text-[15px] font-medium text-ink truncate">Neural Stream™ <span className="text-brass">DS-28</span></span>
         </button>
         <nav className="flex items-center gap-1 overflow-x-auto" aria-label="Main">
           {VIEWS.map(([id, label]) => (
             <button key={id} onClick={() => setView(id)} aria-current={view === id ? "page" : undefined}
-              className={`whitespace-nowrap rounded-lg px-3 py-1.5 text-[14px] transition-colors ${view === id ? "bg-card text-ink" : "text-mute hover:text-ink"}`}>{label}</button>
+              className={`whitespace-nowrap rounded-lg px-3 py-1.5 text-[14px] transition-colors ${view === id ? "bg-card text-ink" : "text-ink/70 hover:text-ink"}`}>{label}</button>
           ))}
         </nav>
-        <div className="text-[12px]">{pill}</div>
+        {pill && <div className="text-[12px]">{pill}</div>}
       </div>
     </header>
   );
 }
 
-/* ───────────── Shape Studio (hero) ───────────── */
+/* ───────────── Home: full-screen hero ───────────── */
+function Home({ design, order, onStart, onManual }) {
+  const [leaving, setLeaving] = useState(false);
+  const finish = findFinish(design.finish);
+  const start = () => {
+    if (leaving) return;
+    setLeaving(true);
+    setTimeout(onStart, 450);
+  };
+  return (
+    <section className={`relative h-[100dvh] min-h-[560px] overflow-hidden transition-opacity duration-500 ${leaving ? "opacity-0" : ""}`}>
+      <div className="absolute inset-0 bg-[radial-gradient(55%_50%_at_60%_45%,rgba(226,177,104,0.12),transparent_70%)]" />
+      <div className={`absolute inset-0 transition-transform duration-500 ${leaving ? "scale-110" : ""}`}>
+        <HeadStage shape={design.shape} color={finish.hex} coating={design.coating} node="temple" frame="hero" autoTurn={true} />
+      </div>
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-slate0 via-slate0/70 to-transparent" />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6 pb-10 sm:pb-14">
+          <Label>Neural Stream™ DS-28</Label>
+          <h1 className="mt-3 text-[40px] sm:text-[64px] font-medium tracking-tight leading-[1.02] max-w-[14ch]">Wear your motor intent.</h1>
+          <p className="mt-4 text-[16px] sm:text-[17px] text-ink/75 max-w-[48ch] leading-relaxed">A skin patch that lets you borrow an expert's hand skills by the hour. You design the shell it wears.</p>
+          <div className="pointer-events-auto mt-7 flex flex-wrap items-center gap-3">
+            <button onClick={start} className="btn-primary !px-7 !py-4 !text-[16px] shadow-[0_0_40px_rgba(226,177,104,.35)]">Get yours now<Icon name="ArrowRight" size={18} /></button>
+            {order && <button onClick={onManual} className="btn-ghost !py-3.5">Track my order</button>}
+            <span className="text-[13px] text-mute">From {inr(PRICING.kit + PRICING.shell)} · free delivery in India</span>
+          </div>
+          <p className="mt-6 flex items-center gap-1.5 text-[12px] text-mute"><Icon name="Rotate3d" size={14} />Drag the head to turn it</p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ───────────── Shape Studio ───────────── */
 const PROMPTS = ["A glossy crimson heart", "Matte gold tear drop", "Cyber cyan lightning bolt", "Satin slate hexagon"];
 
 function SketchPad({ onShape }) {
@@ -482,7 +607,7 @@ function SketchPad({ onShape }) {
   const [live, setLive] = useState(null);
   const pad = useRef(null);
   const pt = (e) => { const r = pad.current.getBoundingClientRect(); return [((e.clientX - r.left) / r.width) * 100, ((e.clientY - r.top) / r.height) * 100]; };
-  const commit = (next) => { setStrokes(next); const d = strokesToPath(next); if (d) onShape({ id: "custom", name: "Your glyph", code: "CST", mode: "stroke", width: 9, d }); };
+  const commit = (next) => { setStrokes(next); const d = strokesToPath(next); if (d) onShape({ id: "custom", name: "Your drawing", code: "CST", mode: "stroke", width: 9, d }); };
   const raw = (p) => p.map((q, i) => `${i ? "L" : "M"}${q[0].toFixed(1)} ${q[1].toFixed(1)}`).join(" ") + (p.length === 1 ? " l0.1 0" : "");
   return (
     <div>
@@ -490,7 +615,7 @@ function SketchPad({ onShape }) {
         onPointerDown={(e) => { e.currentTarget.setPointerCapture(e.pointerId); setLive([pt(e)]); }}
         onPointerMove={(e) => { if (!live) return; const p = pt(e), l = live[live.length - 1]; if (Math.hypot(p[0] - l[0], p[1] - l[1]) > 1.2) setLive([...live, p]); }}
         onPointerUp={() => { if (live) commit([...strokes, live]); setLive(null); }}
-        onPointerCancel={() => setLive(null)} role="img" aria-label="Drawing area for your own glyph">
+        onPointerCancel={() => setLive(null)} role="img" aria-label="Drawing area for your own shape">
         <circle cx="50" cy="50" r="38" fill="none" stroke="#243044" strokeDasharray="1.5 2" strokeWidth=".4" />
         {[...strokes, ...(live ? [live] : [])].map((s, i) => <path key={i} d={raw(s)} fill="none" stroke="#E2B168" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />)}
         {!strokes.length && !live && <text x="50" y="51.5" textAnchor="middle" fontSize="4.4" fill="#94A3B8">Draw inside the circle</text>}
@@ -503,13 +628,81 @@ function SketchPad({ onShape }) {
   );
 }
 
-function Studio({ design, setDesign, onBuy }) {
+/** Upload a portrait; it's projected onto the face of the 3D head. Stays on this device. */
+function PhotoPanel({ photo, setPhoto }) {
+  const input = useRef(null);
+  const [error, setError] = useState("");
+  const load = (file) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) { setError("That file isn't a photo. Choose a JPG or PNG."); return; }
+    setError("");
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        // Downscale large photos so the preview stays quick.
+        const max = 1024, k = Math.min(1, max / Math.max(img.width, img.height));
+        const c = document.createElement("canvas");
+        c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+        c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+        const aspect = c.height / c.width;
+        const size = 0.62;
+        // Assume eyes about 40% down a typical portrait; line them up with the model's eyes.
+        setPhoto({ url: c.toDataURL("image/jpeg", 0.9), aspect, size, x: 0, y: 0.25 - 0.1 * size * aspect, preview: c.toDataURL("image/jpeg", 0.7) });
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  };
+  const nudge = (k, v) => setPhoto((p) => ({ ...p, [k]: v }));
+  return (
+    <div className="rounded-xl border border-brass/40 bg-brass/5 p-4">
+      <input ref={input} type="file" accept="image/*" className="hidden" onChange={(e) => { load(e.target.files[0]); e.target.value = ""; }} />
+      {!photo ? (
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="text-[15px] font-medium">See it on your own face</div>
+            <div className="text-[13px] text-mute">A front-facing photo works best. It stays on this device.</div>
+          </div>
+          <button className="btn-primary" onClick={() => input.current.click()}><Icon name="Camera" size={16} />Upload your photo</button>
+        </div>
+      ) : (
+        <div>
+          <div className="flex items-center gap-3">
+            <img src={photo.preview} alt="Your uploaded photo" className="h-14 w-14 rounded-lg object-cover border border-line" />
+            <div className="min-w-0 flex-1">
+              <div className="text-[15px] font-medium">Your photo is on the model</div>
+              <div className="text-[13px] text-mute">Line up your eyes and nose with the model's.</div>
+            </div>
+            <button className="btn-ghost" onClick={() => setPhoto(null)} aria-label="Remove photo"><Icon name="Trash2" size={14} />Remove</button>
+          </div>
+          <div className="mt-4 grid gap-3 text-[13px]">
+            {[["x", "Left / right", -0.15, 0.15], ["y", "Up / down", -0.15, 0.45], ["size", "Size", 0.35, 1.1]].map(([k, label, min, max]) => (
+              <label key={k} className="grid grid-cols-[6.5rem_1fr] items-center gap-3">
+                <span className="text-mute">{label}</span>
+                <input type="range" min={min} max={max} step="0.005" value={photo[k]} onChange={(e) => nudge(k, +e.target.value)}
+                  style={{ "--pct": `${((photo[k] - min) / (max - min)) * 100}%` }} aria-label={label} />
+              </label>
+            ))}
+          </div>
+          <button className="mt-3 text-[13px] text-brass underline underline-offset-2" onClick={() => input.current.click()}>Use a different photo</button>
+        </div>
+      )}
+      {error && <p className="mt-2 text-[12px] text-crit">{error}</p>}
+    </div>
+  );
+}
+
+function Studio({ design, setDesign, onBuy, photo, setPhoto }) {
   const [mode, setMode] = useState("prompt");
   const [text, setText] = useState(design.prompt || PROMPTS[0]);
   const [heard, setHeard] = useState(null);
   const [autoTurn, setAutoTurn] = useState(true);
   const finish = findFinish(design.finish);
   const set = (patch) => setDesign((d) => ({ ...d, ...patch }));
+  // With a photo on, look at the face (three-quarter, so the temple shell shows too).
+  const frame = photo && design.node === "temple" ? "face" : design.node;
+  useEffect(() => { if (photo) setAutoTurn(false); }, [!!photo]);
 
   const create = (value = text) => {
     const r = parsePrompt(value);
@@ -521,41 +714,35 @@ function Studio({ design, setDesign, onBuy }) {
     <main className="mx-auto max-w-6xl px-4 sm:px-6 py-6 fade-in">
       <div className="mb-5">
         <Label>Shape Studio</Label>
-        <h1 className="mt-2 text-[28px] sm:text-[36px] font-medium tracking-tight leading-tight">Wear your motor intent.</h1>
-        <p className="mt-2 text-[15px] text-ink/70 max-w-[60ch] leading-relaxed">Design the shell that clips over your patch. Every change appears on the head straight away. Drag to turn it all the way round.</p>
+        <h1 className="mt-2 text-[28px] sm:text-[36px] font-medium tracking-tight leading-tight">Design your shell</h1>
+        <p className="mt-2 text-[15px] text-ink/70 max-w-[60ch] leading-relaxed">The shell is the cover that clips over your patch. Every change shows on the model straight away.</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
         <Card className="lg:col-span-3 overflow-hidden">
-          <div className="relative h-[440px] sm:h-[540px] bg-[radial-gradient(50%_45%_at_50%_42%,rgba(226,177,104,0.10),transparent_70%)]">
-            <HeadStage shape={design.shape} color={finish.hex} coating={design.coating} node={design.node} autoTurn={autoTurn} />
-            {design.node === "forearm" && (
-              <div className="absolute right-3 top-3 rounded-xl border border-line bg-slate0/90 p-3 w-[150px]">
-                <svg viewBox="150 200 90 140" className="w-full" aria-label="Your shell on the forearm">
-                  <path d="M172 150 L184 228 L200 300 L210 322" fill="none" stroke="#94A3B8" strokeWidth="9" strokeLinecap="round" opacity=".35" />
-                  <Shell shape={design.shape} color={finish.hex} coating={design.coating} x="180" y="246" width="30" height="30" />
-                </svg>
-                <p className="text-[12px] text-mute text-center">Forearm strap</p>
-              </div>
-            )}
+          <div className="relative h-[440px] sm:h-[560px] bg-[radial-gradient(50%_45%_at_50%_42%,rgba(226,177,104,0.10),transparent_70%)]">
+            <HeadStage shape={design.shape} color={finish.hex} coating={design.coating} node={design.node} autoTurn={autoTurn} photo={photo} frame={frame} />
             <div className="absolute inset-x-0 bottom-0 p-3 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
-              <span className="rounded-full bg-slate0/80 border border-line px-3 py-1.5 text-[12px] text-mute flex items-center gap-1.5"><Icon name="Rotate3d" size={14} />Drag to turn · scroll or pinch to zoom</span>
+              <span className="rounded-full bg-slate0/80 border border-line px-3 py-1.5 text-[12px] text-ink/80 flex items-center gap-1.5"><Icon name="Rotate3d" size={14} />Drag to turn · scroll or pinch to zoom</span>
               <button onClick={() => setAutoTurn((a) => !a)} className="pointer-events-auto rounded-full bg-slate0/80 border border-line px-3 py-1.5 text-[12px] text-ink flex items-center gap-1.5 hover:border-brass/60">
-                <Icon name={autoTurn ? "Pause" : "Play"} size={14} />{autoTurn ? "Pause turning" : "Turn slowly"}
+                <Icon name={autoTurn ? "Pause" : "Play"} size={14} />{autoTurn ? "Stop turning" : "Turn slowly"}
               </button>
             </div>
           </div>
-          <div className="border-t border-line p-4 flex flex-wrap items-center gap-2">
-            <span className="text-[13px] text-mute mr-1">Wear it on</span>
-            {Object.entries(NODES).map(([k, n]) => (
-              <button key={k} onClick={() => set({ node: k })} aria-pressed={design.node === k}
-                className={`rounded-lg border px-3 py-1.5 text-[13px] transition-colors ${design.node === k ? "border-brass/60 bg-slate0 text-ink" : "border-line text-ink/70 hover:text-ink"}`}>{n.name}</button>
-            ))}
-            <span className="text-[12px] text-mute ml-auto">{NODES[design.node].bestFor}</span>
+          <div className="border-t border-line p-4">
+            <div className="flex flex-wrap items-center gap-2" role="radiogroup" aria-label="Where you'll wear it">
+              <span className="text-[13px] text-mute mr-1">Wear it on</span>
+              {Object.entries(NODES).map(([k, n]) => (
+                <button key={k} role="radio" aria-checked={design.node === k} onClick={() => set({ node: k })}
+                  className={`rounded-lg border px-3 py-1.5 text-[13px] transition-colors ${design.node === k ? "border-brass/60 bg-slate0 text-ink" : "border-line text-ink/70 hover:text-ink"}`}>{n.name}</button>
+              ))}
+            </div>
+            <p className="mt-2 text-[13px] text-ink/70">{NODES[design.node].bestFor}</p>
           </div>
         </Card>
 
         <Card className="lg:col-span-2 p-5 sm:p-6 flex flex-col gap-5">
+          <PhotoPanel photo={photo} setPhoto={setPhoto} />
           <div>
             <div className="grid grid-cols-3 gap-1 rounded-xl border border-line bg-slate0 p-1" role="tablist" aria-label="How to make your shape">
               {[["prompt", "Describe", "Wand2"], ["shapes", "Shapes", "Hexagon"], ["draw", "Draw", "PenLine"]].map(([id, label, icon]) => (
@@ -578,8 +765,8 @@ function Studio({ design, setDesign, onBuy }) {
                   {heard && (
                     <p className="mt-3 text-[13px] text-mute">
                       {heard.shapeId || heard.finishId || heard.coating
-                        ? <>Applied: {[heard.shapeId && findShape(heard.shapeId).name, heard.finishId && findFinish(heard.finishId).name, heard.coating && COATINGS.find((c) => c.id === heard.coating).name].filter(Boolean).join(" · ")}. Anything not mentioned stays as it was.</>
-                        : "We didn't recognise a shape, colour or finish. Try words like heart, tear drop, gold or matte."}
+                        ? <>Changed: {[heard.shapeId && findShape(heard.shapeId).name, heard.finishId && findFinish(heard.finishId).name, heard.coating && COATINGS.find((c) => c.id === heard.coating).name].filter(Boolean).join(" · ")}. Anything you didn't mention stays the same.</>
+                        : "We didn't spot a shape, colour or finish. Try words like heart, tear drop, gold or matte."}
                     </p>
                   )}
                 </div>
@@ -622,13 +809,13 @@ function Studio({ design, setDesign, onBuy }) {
             <div>
               <div className="text-[13px] text-mute">{design.shape.name} · {finish.name}</div>
               <div className="text-[22px] font-medium tnum">{inr(PRICING.kit + PRICING.shell)}</div>
-              <div className="text-[12px] text-mute">Patch + printed shell · GST included</div>
+              <div className="text-[12px] text-mute">Patch and shell · tax included</div>
             </div>
             <button className="btn-primary" onClick={onBuy}>Buy now<Icon name="ArrowRight" size={16} /></button>
           </div>
         </Card>
       </div>
-      <p className="mt-4 text-[12px] text-mute">Head scan “Lee Perry-Smith” by Infinite-Realities, licensed CC BY 3.0.</p>
+      <p className="mt-4 text-[12px] text-mute">3D head “Lee Perry-Smith” by Infinite-Realities, licensed CC BY 3.0. The forearm is a simple stand-in model.</p>
     </main>
   );
 }
@@ -779,7 +966,7 @@ function Tabs({ tab, setTab, status }) {
             <button key={t.id} role="tab" aria-selected={on} onClick={() => setTab(t.id)}
               className={`group text-left rounded-xl border px-4 py-3 transition-colors ${on ? "border-brass/60 bg-card" : "border-line bg-transparent hover:bg-card/60"} ${locked && !on ? "opacity-60" : ""}`}>
               <div className="flex items-center justify-between">
-                <span className={`label ${on ? "!text-brass" : ""}`}>Tab {t.code}</span>
+                <span className={`label ${on ? "!text-brass" : ""}`}>{t.code}</span>
                 <Icon name={locked ? "Lock" : t.icon} size={16} className={on ? "text-brass" : "text-mute group-hover:text-ink"} />
               </div>
               <div className={`mt-1 text-[14px] sm:text-[15px] font-medium leading-snug ${on ? "text-ink" : "text-ink/70"}`}>{t.label}</div>
@@ -838,7 +1025,7 @@ function LockedPanel({ tab, order, setTab }) {
           {what}{" "}
           {status === "NO_ORDER" && "Order your DS-28 to get started."}
           {status === "IN_TRANSIT" && `Your patch should arrive by ${by}. Once it's here, unbox it and pair it in Order Tracking.`}
-          {status === "DELIVERED" && "It's arrived. Pair it in Order Tracking by typing the hardware ID printed inside the box lid."}
+          {status === "DELIVERED" && "It's arrived. Pair it in Order Tracking by typing the patch ID printed inside the box lid."}
         </p>
         <p className="mt-4 text-[14px] text-ink/70">While you wait, you can read:</p>
         <div className="mt-3 flex flex-wrap gap-2">
@@ -908,9 +1095,9 @@ function OrderTracking({ order, setOrder, onStudio }) {
           <Card className="p-5 sm:p-7 border-brass/50">
             <Label>Unbox & pair</Label>
             <h2 className="mt-2 text-xl font-medium tracking-tight">Connect your patch</h2>
-            <p className="mt-2 text-[14px] text-ink/70">Lift out the card inside the box lid and type the hardware ID printed on it.</p>
+            <p className="mt-2 text-[14px] text-ink/70">Lift out the card inside the box lid and type the patch ID printed on it.</p>
             <form onSubmit={pair} className="mt-4 grid gap-2" noValidate>
-              <label htmlFor="pair" className="text-[13px]">Hardware ID</label>
+              <label htmlFor="pair" className="text-[13px]">Patch ID</label>
               <input id="pair" value={code} onChange={(e) => setCode(e.target.value)} placeholder="DS28-XXX-000" autoComplete="off" aria-invalid={!!err} className={`field uppercase ${err ? "border-crit" : ""}`} />
               {err && <p className="text-[12px] text-crit">{err}</p>}
               <button className="btn-primary mt-1" type="submit"><Icon name="Link" size={16} />Pair patch</button>
@@ -929,7 +1116,7 @@ function OrderTracking({ order, setOrder, onStudio }) {
             <div className="h-16 w-16 rounded-xl border border-line bg-slate0 grid place-items-center shrink-0"><Shell shape={order.design.shape} color={finish.hex} coating={order.design.coating} size={40} /></div>
             <div className="text-[14px] min-w-0">
               <div>{order.design.shape.name} shell · {finish.name}</div>
-              <div className="text-[13px] text-mute">Hardware ID <span className="text-brass tnum">{order.serial}</span></div>
+              <div className="text-[13px] text-mute">Patch ID <span className="text-brass tnum">{order.serial}</span></div>
             </div>
           </div>
           <address className="mt-4 not-italic text-[14px] text-ink/80 leading-relaxed">
@@ -1040,7 +1227,7 @@ function Calibration({ order, setOrder, setTab }) {
         </div>
         {done && b && (
           <div className="mt-3 rounded-xl border border-line p-3 text-[13px] text-ink/80">
-            Baseline saved: steadiness {b.steadiness}%, response {b.response} ms, endurance {b.endurance} min.
+            Saved: steadiness {b.steadiness}%, reaction {(b.response / 1000).toFixed(2)} s, stamina {b.endurance} min.
             <button className="ml-1 text-brass underline underline-offset-2" onClick={() => setTab("rental")}>See what it means</button>
           </div>
         )}
@@ -1087,9 +1274,9 @@ function SkillProfile({ order, rec, live, setTab }) {
     );
   }
   const tiles = [
-    ["Steadiness", `${b.steadiness}%`, b.steadiness, "Share of the 3-second hold with no tremor", b.steadiness >= 82 ? "Very steady" : b.steadiness >= 70 ? "Steady" : "Building up"],
-    ["Response", `${b.response} ms`, Math.max(0, 100 - (b.response - 150)), "Time from deciding to move to your muscle responding", b.response <= 220 ? "Quick" : "Average"],
-    ["Endurance", `${b.endurance} min`, Math.min(100, b.endurance / 1.2), "How long your signal stays clean before tiring, estimated from the hold", b.endurance >= 90 ? "Long" : b.endurance >= 60 ? "Good" : "Short"],
+    ["Steadiness", `${b.steadiness}%`, b.steadiness, "How much of the 3-second hold your hand stayed still", b.steadiness >= 82 ? "Very steady" : b.steadiness >= 70 ? "Steady" : "Building up"],
+    ["Reaction", `${(b.response / 1000).toFixed(2)} s`, Math.max(0, 100 - (b.response - 150)), "Time from deciding to move to your muscle moving", b.response <= 220 ? "Quick" : "Average"],
+    ["Stamina", `${b.endurance} min`, Math.min(100, b.endurance / 1.2), "How long your muscles stay fresh before they tire, estimated from the hold", b.endurance >= 90 ? "Long" : b.endurance >= 60 ? "Good" : "Short"],
   ];
   return (
     <Card className="p-5 sm:p-7">
@@ -1097,7 +1284,7 @@ function SkillProfile({ order, rec, live, setTab }) {
         <div className="lg:col-span-3">
           <Label>Skill calibration profile</Label>
           <h2 className="mt-2 text-xl font-medium tracking-tight">Your baseline</h2>
-          <p className="mt-1 text-[13px] text-mute">Measured by your patch ({order.serial}) on the {NODES[b.node].name.toLowerCase()} during calibration, {new Date(b.at).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}. Recalibrate to measure again.</p>
+          <p className="mt-1 text-[13px] text-mute">Measured by your patch on your {NODES[b.node].name.toLowerCase()} during setup, {new Date(b.at).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}. Set up again any time to re-measure.</p>
           <div className="mt-4 grid sm:grid-cols-3 gap-2">
             {tiles.map(([k, v, pct, how, word]) => (
               <div key={k} className="rounded-xl border border-line bg-slate0 p-3">
@@ -1111,14 +1298,14 @@ function SkillProfile({ order, rec, live, setTab }) {
           <p className="mt-3 text-[13px] text-mute">Streaming history: {rec.sessions} session{rec.sessions === 1 ? "" : "s"}, {fmtH(rec.mins)} logged.</p>
         </div>
         <div className="lg:col-span-2">
-          <Label>Live input signals</Label>
+          <Label>Right now</Label>
           <div className="mt-3 rounded-xl border border-line bg-slate0 p-3">
-            <div className="flex justify-between text-[13px]"><span className="text-mute">Muscle activity</span><span className="tnum">{Math.round(signals.activity[signals.activity.length - 1])}%</span></div>
+            <div className="flex justify-between text-[13px]"><span className="text-mute">Muscle movement</span><span className="tnum">{Math.round(signals.activity[signals.activity.length - 1])}%</span></div>
             <Spark values={signals.activity} />
             <div className="mt-3 flex justify-between text-[13px]"><span className="text-mute">Skin contact</span><span className="text-ok">{signals.contact >= 90 ? "Good" : "Fair"} · {signals.contact}%</span></div>
-            <div className="mt-1.5 flex justify-between text-[13px]"><span className="text-mute">Signal quality</span><span className="tnum">{signals.quality}%</span></div>
+            <div className="mt-1.5 flex justify-between text-[13px]"><span className="text-mute">Connection</span><span>{signals.quality >= 92 ? "Strong" : "Good"}</span></div>
           </div>
-          <p className="mt-2 text-[12px] text-mute">{live ? "Streaming now: activity reflects the skill driving your muscles." : "Resting reading from the paired patch."}</p>
+          <p className="mt-2 text-[12px] text-mute">{live ? "A skill is running, so your muscles are busier." : "Your muscles at rest, read by your patch."}</p>
         </div>
       </div>
 
@@ -1350,11 +1537,10 @@ function AnatomyMap({ order, design, setOrder }) {
               <p className="mt-1 text-[14px] text-ink/70">{n.bestFor}</p>
             </div>
             <div className="text-right">
-              <Label>Signal quality</Label>
-              <div className="mt-1 text-[28px] text-brass tnum">{n.fidelity}<span className="text-[14px] text-mute">%</span></div>
+              <Label>How well it reads you</Label>
+              <div className="mt-1 text-[22px] text-brass">{n.strength}</div>
             </div>
           </div>
-          <div className="mt-4 h-1.5 w-full rounded-full bg-slate0 overflow-hidden"><div className="h-full bg-brass rounded-full transition-all duration-700" style={{ width: `${n.fidelity}%` }} /></div>
           <div className="mt-6 grid sm:grid-cols-2 gap-6">
             <div className="min-w-0">
               <Label className="flex items-center gap-2"><Icon name="Hand" size={13} />What it helps with</Label>
@@ -1365,10 +1551,6 @@ function AnatomyMap({ order, design, setOrder }) {
               <ul className="mt-3 grid gap-2.5">{n.place.map((p) => <li key={p} className="text-[14px] text-ink/85 leading-snug pl-4 border-l border-line">{p}</li>)}</ul>
             </div>
           </div>
-          <details className="group mt-6 rounded-xl border border-line bg-slate0">
-            <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3 text-[14px] text-mute hover:text-ink">Technical details<Icon name="ChevronDown" size={16} className="transition-transform group-open:rotate-180" /></summary>
-            <dl className="grid grid-cols-3 gap-2 px-4 pb-4">{n.tech.map(([k, v]) => <div key={k}><dt className="text-[12px] text-mute">{k}</dt><dd className="text-[14px] tnum">{v}</dd></div>)}</dl>
-          </details>
           {order && sel !== worn && (
             <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-dashed border-line p-3">
               <p className="text-[13px] text-mute">Moving the patch means calibrating again in the new spot.</p>
@@ -1391,7 +1573,7 @@ const RISKS = [
     act: ["Finish the full rest time before driving, cooking with knives or using machinery.", "Get medical advice if the shaking lasts more than 6 hours or spreads to a limb you didn't stream."] },
   { id: "umc", title: "Trying to keep a rented skill", sev: "Not allowed", icon: "Ban",
     body: "Skills are rented, not bought. Trying to keep one after the session, by over-rehearsing or modified software, leaves you with a movement pattern your body isn't ready for and can injure tendons and joints.",
-    act: ["The patch deletes each skill when the session ends. Don't try to stop this.", "Attempts are blocked straight away and reported to the skill's owner under Terms §11.4."] },
+    act: ["The patch deletes each skill when the session ends. Don't try to stop this.", "Attempts are blocked straight away and the skill's owner is told."] },
 ];
 const sevColor = { Common: "#F5B84B", Serious: "#F87171", "Not allowed": "#F87171" };
 
@@ -1433,8 +1615,8 @@ function Safety({ onDRM, drm, paired }) {
         <h2 className="mt-2 text-xl font-medium tracking-tight">How skills are protected</h2>
         <p className="mt-2 text-[14px] text-ink/70 leading-relaxed">Each rented skill is locked to one session with a key that expires when you disconnect. Nothing about the skill is kept on your patch afterwards.</p>
         <ul className="mt-4 grid gap-2 text-[14px] text-ink/80">
-          <li className="flex gap-2"><Icon name="BadgeCheck" size={16} className="text-brass mt-0.5" />Class IIb non-invasive device (fictional, 2035)</li>
-          <li className="flex gap-2"><Icon name="BadgeCheck" size={16} className="text-brass mt-0.5" />Raw signals never leave the patch</li>
+          <li className="flex gap-2"><Icon name="BadgeCheck" size={16} className="text-brass mt-0.5" />Sits on the skin. Nothing goes under it.</li>
+          <li className="flex gap-2"><Icon name="BadgeCheck" size={16} className="text-brass mt-0.5" />Readings from your body stay on the patch</li>
           <li className="flex gap-2"><Icon name="BadgeCheck" size={16} className="text-brass mt-0.5" />Clinical Support 24/7: <span className="select-all">1800 210 4242</span></li>
         </ul>
         {paired ? (
@@ -1590,16 +1772,18 @@ const makeSerial = (code) => `DS28-${code}-${100 + Math.floor(Math.random() * 90
 function App() {
   const saved = useMemo(load, []);
   const fromHash = location.hash.replace("#", "");
-  const [view, setView] = useState(["studio", "checkout", "manual"].includes(fromHash) ? fromHash : TABS.some((t) => t.id === fromHash) ? "manual" : "studio");
+  const [view, setView] = useState(["home", "studio", "checkout", "manual"].includes(fromHash) ? fromHash : TABS.some((t) => t.id === fromHash) ? "manual" : "home");
   const [tab, setTab] = useState(TABS.some((t) => t.id === fromHash) ? fromHash : "order");
   const [design, setDesign] = useState(saved.design || DEFAULT_DESIGN);
   const [order, setOrder] = useState(saved.order || null);
+  // The uploaded photo is kept in memory only, never saved.
+  const [photo, setPhoto] = useState(null);
   const [drm, setDrm] = useState(false);
   const [glitch, setGlitch] = useState(false);
   const [modal, setModal] = useState(false);
 
   useEffect(() => { try { localStorage.setItem(STORE, JSON.stringify({ design, order })); } catch {} }, [design, order]);
-  useEffect(() => { window.scrollTo({ top: 0 }); }, [view]);
+  useEffect(() => { window.scrollTo({ top: 0, behavior: view === "studio" ? "smooth" : "auto" }); }, [view]);
 
   const status = statusOf(order);
   const place = ({ address, delivery, pay, total }) => {
@@ -1620,8 +1804,9 @@ function App() {
   return (
     <>
       <div className={glitch ? "glitch" : ""}>
-        <Header view={view} setView={setView} order={order} />
-        {view === "studio" && <Studio design={design} setDesign={setDesign} onBuy={() => setView("checkout")} />}
+        <Header view={view} setView={setView} order={order} overlay={view === "home"} />
+        {view === "home" && <Home design={design} order={order} onStart={() => setView("studio")} onManual={() => { setTab("order"); setView("manual"); }} />}
+        {view === "studio" && <Studio design={design} setDesign={setDesign} onBuy={() => setView("checkout")} photo={photo} setPhoto={setPhoto} />}
         {view === "checkout" && <Checkout design={design} order={order} onPlace={place} onManual={() => { setTab("order"); setView("manual"); }} onNewOrder={() => { setOrder(null); setView("studio"); }} />}
         {view === "manual" && (
           <>
@@ -1641,11 +1826,10 @@ function App() {
             </main>
           </>
         )}
-        <footer className="mx-auto max-w-6xl px-4 sm:px-6 pb-10 flex flex-wrap gap-x-6 gap-y-2 justify-between text-[12px] text-mute">
+        {view !== "home" && <footer className="mx-auto max-w-6xl px-4 sm:px-6 pb-10 flex flex-wrap gap-x-6 gap-y-2 justify-between text-[12px] text-mute">
           <span>Neural Stream™ DS-28 · speculative design set in 2035, not a real product</span>
           <span>Clinical Support 24/7 · 1800 210 4242</span>
-          <span>Web Manual rev. 5.0 · Oct 2026</span>
-        </footer>
+        </footer>}
       </div>
       {modal && <Lockout onClose={closeModal} />}
     </>
