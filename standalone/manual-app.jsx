@@ -822,8 +822,9 @@ function Studio({ design, setDesign, onBuy, photo, setPhoto }) {
 /* ───────────── Checkout ───────────── */
 const EMPTY_ADDRESS = { name: "", phone: "", street: "", area: "", city: "", state: "", pin: "" };
 
-function Checkout({ design, order, onPlace, onManual, onNewOrder }) {
-  const [a, setA] = useState(EMPTY_ADDRESS);
+function Checkout({ design, order, onPlace, onManual }) {
+  // Pre-fill from your last order, if there is one; every field stays editable.
+  const [a, setA] = useState(order ? { ...EMPTY_ADDRESS, ...order.address } : EMPTY_ADDRESS);
   const [touched, setTouched] = useState({});
   const [tried, setTried] = useState(false);
   const [speed, setSpeed] = useState("standard");
@@ -833,23 +834,6 @@ function Checkout({ design, order, onPlace, onManual, onNewOrder }) {
   const show = (k) => (tried || touched[k]) && errors[k];
   const del = DELIVERY.find((d) => d.id === speed);
   const total = PRICING.kit + PRICING.shell + del.fee;
-
-  if (order) {
-    const [, by] = deliveryWindow(order.delivery, new Date(order.placedAt));
-    return (
-      <main className="mx-auto max-w-3xl px-4 sm:px-6 py-10 fade-in">
-        <Card className="p-6 sm:p-7">
-          <Label>Order {order.number}</Label>
-          <h1 className="mt-2 text-2xl font-medium tracking-tight">Your patch is on its way</h1>
-          <p className="mt-2 text-[15px] text-ink/70">Arriving by {shortDate(by)} at {order.address.city}, {order.address.pin}. Follow it in the Web Manual.</p>
-          <div className="mt-5 flex flex-wrap gap-2">
-            <button className="btn-primary" onClick={onManual}>Track my order<Icon name="ArrowRight" size={16} /></button>
-            <button className="btn-ghost" onClick={onNewOrder}>Start a new order</button>
-          </div>
-        </Card>
-      </main>
-    );
-  }
 
   const submit = (e) => {
     e.preventDefault();
@@ -873,6 +857,12 @@ function Checkout({ design, order, onPlace, onManual, onNewOrder }) {
         <Label>Checkout</Label>
         <h1 className="mt-2 text-[28px] font-medium tracking-tight">Where should we deliver it?</h1>
       </div>
+      {order && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-card px-4 py-3 text-[14px]">
+          <span className="text-ink/80">You already have order {order.number}, arriving by {shortDate(deliveryWindow(order.delivery, new Date(order.placedAt))[1])}. Placing this order starts a new one; we've filled in the address from your last order.</span>
+          <button type="button" className="btn-ghost" onClick={onManual}>Track it<Icon name="ArrowRight" size={14} /></button>
+        </div>
+      )}
       <form onSubmit={submit} noValidate className="grid grid-cols-1 lg:grid-cols-5 gap-4 items-start">
         <div className="lg:col-span-3 grid gap-4">
           <Card className="p-5 sm:p-7">
@@ -2042,7 +2032,7 @@ function App() {
         <Header view={view} setView={setView} order={order} overlay={view === "home"} />
         {view === "home" && <Home design={design} order={order} onStart={() => setView("studio")} onManual={() => { setTab("order"); setView("manual"); }} />}
         {view === "studio" && <Studio design={design} setDesign={setDesign} onBuy={() => setView("checkout")} photo={photo} setPhoto={setPhoto} />}
-        {view === "checkout" && <Checkout design={design} order={order} onPlace={place} onManual={() => { setTab("order"); setView("manual"); }} onNewOrder={() => { setOrder(null); setView("studio"); }} />}
+        {view === "checkout" && <Checkout design={design} order={order} onPlace={place} onManual={() => { setTab("order"); setView("manual"); }} />}
         {view === "manual" && (
           <>
             <DevBar order={order} setOrder={setOrder} onDemo={demo} />
