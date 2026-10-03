@@ -116,6 +116,8 @@ export default function HeadViewer({ onMorph, onState }) {
       const h = el.clientHeight;
       renderer.setSize(w, h, false);
       camera.aspect = w / h;
+      // Pull back on narrow (portrait) viewports so the whole head stays in frame.
+      camera.position.z = 2.15 * Math.max(1, 0.95 / camera.aspect);
       camera.updateProjectionMatrix();
     };
     const ro = new ResizeObserver(resize);
@@ -158,7 +160,7 @@ export default function HeadViewer({ onMorph, onState }) {
         pivot.add(head);
         pivot.updateMatrixWorld(true);
 
-        camera.position.set(0, 0.2, 2.15);
+        camera.position.set(0, 0.2, 2.15 * Math.max(1, 0.95 / camera.aspect));
         camera.lookAt(0, 0.16, 0);
 
         // Find the temple from the scan itself: measure the head's front and back at brow

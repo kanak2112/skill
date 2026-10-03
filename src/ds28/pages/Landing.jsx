@@ -48,7 +48,7 @@ export default function Landing({ onStart, order, onOrder }) {
           <HeadViewer onMorph={setIdx} onState={setState} />
         )}
       </div>
-      <p className="relative z-10 -mt-6 text-center text-caption text-muted" aria-live="polite">
+      <p className="relative z-10 -mt-6 px-4 text-center text-caption text-muted" aria-live="polite">
         Shown: <span className="text-ink">{m.name}</span> shell in {m.finish} on the temple
         {state === 'ready' && <span className="hidden sm:inline"> · drag to turn</span>}
       </p>
