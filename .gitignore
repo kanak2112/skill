@@ -2,3 +2,7 @@ node_modules
 dist
 .DS_Store
 *.log
+film/.libs/
+film/frames/
+film/dry/
+film/*.mp4
