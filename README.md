@@ -125,9 +125,10 @@ from an in-world clock: today's date and time, moved to 2035.
   `MarketplaceFrame`, bundled from `standalone/vault-entry.jsx` with the manual's colours and icons)
   → 4 personalised plan → 5 pay, which needs the risks acknowledged first → 6–8 Where to Wear It,
   Safety, Hardware (each skippable).
-- **Your Sessions** runs the paid plan. After every session a debrief shows how closely you matched
-  the expert, how the skill fades over the rest period and how much stays, how your own unassisted
-  steadiness has moved, and offers a paid retention licence for what stays.
+- **Your Sessions** runs the paid plan. After every session a full-screen debrief plays out: the
+  expert's hands leaving yours, a counter and curve falling to the share of the skill that stays, how
+  closely you matched the expert, how your own unassisted steadiness has moved, and a paid retention
+  licence for what stays. “See the last debrief again” replays it.
 
 **Presenting:** press `P` (or open with `?present`) to hide the prototype controls. Shortcuts:
 `D` next delivery step (places a demo order first if there is none, ends by pairing), `F` end the

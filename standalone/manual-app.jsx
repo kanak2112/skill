@@ -46,10 +46,10 @@ const SHAPES = [
   { id: "chevron", name: "Wings", code: "CHV", mode: "fill", d: "M6 26 L50 56 L94 26 L94 50 L50 82 L6 50 Z" },
 ];
 const FINISHES = [
-  { id: "red", name: "Electro-Chromic Red", hex: "#ff2a4b" },
-  { id: "cyan", name: "Cyber Cyan", hex: "#00f0ff" },
-  { id: "gold", name: "Matte Gold", hex: "#ffb703" },
-  { id: "slate", name: "Stealth Slate", hex: "#5b6b82" },
+  { id: "red", name: "Ember", hex: "#e5484d" },
+  { id: "cyan", name: "Glacier", hex: "#5ec8d8" },
+  { id: "gold", name: "Saffron", hex: "#eaa53a" },
+  { id: "slate", name: "Graphite", hex: "#5b6b82" },
 ];
 const COATINGS = [
   { id: "gloss", name: "Glossy", rough: 0.16, metal: 0.6, coat: 1 },
@@ -62,7 +62,7 @@ const findFinish = (id) => FINISHES.find((f) => f.id === id) || FINISHES[0];
 /* Prompt → shape, colour, finish. Words the parser doesn't know leave the setting unchanged. */
 const WORDS = {
   shape: [["heart", ["heart", "love"]], ["tear", ["tear", "teardrop", "drop", "droplet"]], ["anger", ["anger", "angry", "rage", "glyph"]], ["bolt", ["bolt", "lightning", "spark", "electric"]], ["hex", ["hex", "hexagon", "honeycomb"]], ["star", ["star"]], ["crescent", ["moon", "crescent"]], ["chevron", ["wing", "wings", "chevron"]]],
-  color: [["red", ["red", "crimson", "ruby", "scarlet"]], ["cyan", ["cyan", "blue", "teal", "aqua"]], ["gold", ["gold", "golden", "yellow", "amber"]], ["slate", ["slate", "stealth", "grey", "gray", "black", "silver"]]],
+  color: [["red", ["ember", "red", "crimson", "ruby", "scarlet"]], ["cyan", ["glacier", "ice", "cyan", "blue", "teal", "aqua"]], ["gold", ["saffron", "gold", "golden", "yellow", "amber"]], ["slate", ["graphite", "slate", "grey", "gray", "black", "silver"]]],
   coat: [["gloss", ["glossy", "gloss", "shiny", "metallic", "chrome", "polished"]], ["satin", ["satin", "pearl", "silk"]], ["matte", ["matte", "flat", "brushed"]]],
 };
 function parsePrompt(text) {
@@ -632,7 +632,7 @@ function Home({ design, order, onStart, onManual }) {
 }
 
 /* ───────────── Shape Studio ───────────── */
-const PROMPTS = ["A glossy crimson heart", "Matte gold tear drop", "Cyber cyan lightning bolt", "Satin slate hexagon"];
+const PROMPTS = ["A glossy ember heart", "Matte saffron tear drop", "Glacier lightning bolt", "Satin graphite hexagon"];
 
 function SketchPad({ onShape }) {
   const [strokes, setStrokes] = useState([]);
@@ -1889,87 +1889,120 @@ function Sessions({ order, setOrder, setTab }) {
           })}
         </ul>
         {!order.calibrated && <p className="mt-3 text-[13px] text-warn">Calibrate again in Setup before your next session.</p>}
-        <button className="btn-ghost mt-4" onClick={() => setOrder((o) => ({ ...o, journeyDone: false, journeyStep: "skills", plan: null }))}>Change skills for next month</button>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <button className="btn-ghost" onClick={() => setOrder((o) => ({ ...o, journeyDone: false, journeyStep: "skills", plan: null }))}>Change skills for next month</button>
+          {last && last.seen && <button className="btn-ghost" onClick={() => markLast({ seen: false })}><Icon name="History" size={14} />See the last debrief again</button>}
+        </div>
       </Card>
     </div>
   );
 }
 
 /* ───────────── After a session: what stays, what fades ───────────── */
-function DecayChart({ kept, restMins }) {
-  const W = 560, H = 170, pad = { l: 36, r: 10, t: 14, b: 24 };
-  const x = (f) => pad.l + f * (W - pad.l - pad.r), y = (v) => pad.t + (1 - v / 100) * (H - pad.t - pad.b);
-  const pts = Array.from({ length: 41 }, (_, i) => { const f = i / 40; return [x(f), y(kept + (100 - kept) * Math.exp(-4.2 * f))]; });
-  const line = pts.map((p, i) => `${i ? "L" : "M"}${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(" ");
-  return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label={`Skill fades from 100% to ${kept}% over ${fmtH(restMins)}`}>
-      {[0, 50, 100].map((v) => <g key={v}><line x1={pad.l} x2={W - pad.r} y1={y(v)} y2={y(v)} stroke="#243044" strokeWidth="1" /><text x={pad.l - 6} y={y(v) + 3.5} textAnchor="end" fontSize="10" fill="#94A3B8">{v}%</text></g>)}
-      <path d={`${line} L${x(1)} ${y(0)} L${x(0)} ${y(0)} Z`} fill="rgba(226,177,104,.10)" />
-      <path d={line} fill="none" stroke="#E2B168" strokeWidth="2" />
-      <line x1={pad.l} x2={W - pad.r} y1={y(kept)} y2={y(kept)} stroke="#4ADE80" strokeDasharray="3 3" strokeWidth="1" />
-      <text x={W - pad.r} y={y(kept) - 5} textAnchor="end" fontSize="10.5" fill="#4ADE80">stays: {kept}%</text>
-      <circle cx={x(0)} cy={y(100)} r="4" fill="#E2B168" />
-      <text x={x(0)} y={H - 6} fontSize="10" fill="#94A3B8">Now</text>
-      <text x={W - pad.r} y={H - 6} textAnchor="end" fontSize="10" fill="#94A3B8">End of rest · {fmtH(restMins)}</text>
-    </svg>
-  );
-}
+/* The fade, normalised so it starts at 100% and lands exactly on what stays. */
+const fadeAt = (kept, f) => kept + (100 - kept) * (Math.exp(-4.2 * f) - Math.exp(-4.2)) / (1 - Math.exp(-4.2));
 
-/** Shown once after every session: the third act. The skill leaves; a little of it, and a little of you, changes. */
+/**
+ * Shown full screen after every session: the third act. The expert's hands leave yours, the curve
+ * draws itself down to what stays, then the bill for keeping it arrives.
+ */
+const BEATS = { title: 250, count: 1500, countLen: 4200, facts: 6200, drift: 7000, offer: 7800 };
 function Debrief({ entry, profile, order, onDone }) {
+  const reduce = useMemo(() => window.matchMedia("(prefers-reduced-motion: reduce)").matches, []);
+  const end = BEATS.offer + 600;
+  const [t, setT] = useState(reduce ? end : 0);
   const [buying, setBuying] = useState(false);
+  useEffect(() => {
+    if (t >= end) return;
+    const t0 = performance.now() - t;
+    let raf = requestAnimationFrame(function step(now) { const v = Math.min(end, now - t0); setT(v); if (v < end) raf = requestAnimationFrame(step); });
+    return () => cancelAnimationFrame(raf);
+  }, [t >= end]);
+  useEffect(() => { const prev = document.body.style.overflow; document.body.style.overflow = "hidden"; return () => { document.body.style.overflow = prev; }; }, []);
+
   const m = findModel(entry.id);
   const it = order.plan && order.plan.items.find((x) => x.id === entry.id);
   const hourly = it ? it.hourly : m ? m.hourly : 2000;
   const price = Math.round((hourly * entry.kept * 2.5) / 100) * 100;
-  const who = m && m.expert ? m.expert : "the skill's owners";
+  const expert = m && m.expert;
   const name = entry.title.replace(/ v\d.*$/, "");
   const restMins = Math.max(1, Math.round(entry.rest / 60000));
-  const sessions = (order.history || []).length;
   const floor = profile.startSteadiness - 10;
-  return (
-    <Card className="p-5 sm:p-7 border-brass/50 fade-in">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <Label>Session over · {fmtH(entry.minutes)}</Label>
-          <h2 className="mt-2 text-2xl sm:text-[28px] font-medium tracking-tight">{name} is leaving your hands</h2>
-          <p className="mt-1 text-[15px] text-ink/70 max-w-[60ch]">Over the next {fmtH(restMins)} the skill fades from your muscles. Here's what that session left behind.</p>
+  const f = Math.min(1, Math.max(0, (t - BEATS.count) / BEATS.countLen));
+  const fe = 1 - Math.pow(1 - f, 2);
+  const value = fadeAt(entry.kept, fe);
+  const done = f >= 1;
+  const show = (at) => `transition-all duration-700 ease-out ${t >= at ? "opacity-100 translate-y-0" : "opacity-0 translate-y-3 pointer-events-none"}`;
+
+  const W = 1000, H = 240, N = 80;
+  const pts = Array.from({ length: Math.max(2, Math.round(fe * N) + 1) }, (_, i) => { const k = Math.min(fe, i / N); return [k * W, H - (fadeAt(entry.kept, k) / 100) * H]; });
+  const line = pts.map((p, i) => `${i ? "L" : "M"}${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(" ");
+  const head = pts[pts.length - 1];
+  const keptY = H - (entry.kept / 100) * H;
+
+  // Rendered at the top of the page: the tab panels animate with transforms, which would trap a fixed layer.
+  return ReactDOM.createPortal(
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-[#06080d] text-ink" role="dialog" aria-modal="true" aria-labelledby="debrief-title">
+      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(60%_50%_at_30%_35%,rgba(226,177,104,0.10),transparent_70%)]" />
+      <div className="relative mx-auto flex min-h-full max-w-5xl flex-col justify-center px-5 py-10 sm:px-10 sm:py-14">
+        <div className="flex items-center justify-between gap-4">
+          <Label>Session over · {name} · {fmtH(entry.minutes)}</Label>
+          {!done && <button className="text-[13px] text-mute hover:text-ink" onClick={() => setT(end)}>Skip</button>}
         </div>
-      </div>
-      <div className="mt-5 grid grid-cols-1 lg:grid-cols-5 gap-5">
-        <div className="lg:col-span-3">
-          <div className="grid grid-cols-3 gap-2">
-            {[["Matched the expert", `${entry.match}%`, "How closely your hands followed theirs"], ["Will stay with you", `${entry.kept}%`, "Enough to feel easier next time, not to do it alone"], ["Your own steadiness", `${profile.steadiness}%`, `Was ${profile.startSteadiness}% before your first stream`]].map(([k, v, d]) => (
-              <div key={k} className="rounded-xl border border-line bg-slate0 p-3">
-                <div className="text-[12px] text-mute">{k}</div>
-                <div className="mt-1 text-[22px] font-medium tnum">{v}</div>
-                <p className="mt-1 text-[11.5px] text-mute leading-snug">{d}</p>
-              </div>
-            ))}
+        <h2 id="debrief-title" className={`mt-4 max-w-[18ch] text-[34px] font-medium leading-[1.05] tracking-tight sm:text-[58px] ${show(BEATS.title)}`}>
+          {expert ? `${expert}'s hands are leaving yours.` : `${name} is leaving your hands.`}
+        </h2>
+
+        <div className={`mt-8 grid items-end gap-6 sm:mt-10 lg:grid-cols-[320px_minmax(0,1fr)] ${show(BEATS.count - 300)}`}>
+          <div>
+            <div className="text-[88px] font-light leading-none tracking-tight text-brass tnum sm:text-[148px]" aria-live="off">{Math.round(value)}<span className="text-[0.45em] align-top">%</span></div>
+            <p className="mt-2 max-w-[24ch] text-[15px] text-ink/75 sm:text-[17px]" aria-live="polite">{done ? `stays with you. The rest is gone by the end of your ${fmtH(restMins)} rest.` : "of the skill is still in your hands"}</p>
           </div>
-          <div className="mt-4 rounded-xl border border-line bg-slate0 p-3"><DecayChart kept={entry.kept} restMins={restMins} /></div>
-          <p className="mt-3 text-[13px] text-ink/75">After {sessions} session{sessions === 1 ? "" : "s"}, your hands without the patch are {profile.drift} point{profile.drift === 1 ? "" : "s"} less steady. If they drop to {floor}%, Knack pauses streaming for a week so your own movement can come back.</p>
+          <div className="min-w-0">
+            <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="h-[150px] w-full sm:h-[220px]" aria-hidden="true">
+              <defs><linearGradient id="fadeFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#E2B168" stopOpacity=".28" /><stop offset="1" stopColor="#E2B168" stopOpacity="0" /></linearGradient></defs>
+              <line x1="0" x2={W} y1={H} y2={H} stroke="#243044" strokeWidth="2" vectorEffect="non-scaling-stroke" />
+              <path d={`${line} L${head[0]} ${H} L0 ${H} Z`} fill="url(#fadeFill)" />
+              <path d={line} fill="none" stroke="#E2B168" strokeWidth="3" vectorEffect="non-scaling-stroke" />
+              <line x1="0" x2={W} y1={keptY} y2={keptY} stroke="#4ADE80" strokeDasharray="6 6" strokeWidth="1.5" vectorEffect="non-scaling-stroke" style={{ opacity: done ? 1 : 0, transition: "opacity .8s" }} />
+            </svg>
+            <div className="mt-2 flex justify-between text-[12px] text-mute sm:text-[13px]"><span>Session ends</span><span>End of rest · {fmtH(restMins)}</span></div>
+          </div>
         </div>
-        <div className="lg:col-span-2 flex flex-col gap-3">
-          <div className="rounded-xl border border-line p-4">
-            <div className="text-[15px] font-medium">Keep what stays, for good</div>
-            <p className="mt-1 text-[13px] text-ink/75">A retention licence lets the {entry.kept}% that stays become yours permanently, legally. {who} has agreed to licence it and gets 30%.</p>
-            <p className="mt-2 text-[12px] text-mute">Keeping a skill without a licence is blocked and reported. See “Safety”.</p>
+
+        <div className={`mt-10 grid grid-cols-1 gap-3 sm:grid-cols-3 ${show(BEATS.facts)}`}>
+          {[["Matched the expert", `${entry.match}%`, "How closely your hands followed theirs"], ["Stays with you", `${entry.kept}%`, "Enough to feel easier next time, not to do it alone"], ["Your own steadiness", `${profile.startSteadiness}% → ${profile.steadiness}%`, "Without the patch, since your first stream"]].map(([k, v, d]) => (
+            <div key={k} className="border-t border-line pt-3">
+              <div className="text-[13px] text-mute">{k}</div>
+              <div className="mt-1 text-[28px] font-medium tnum">{v}</div>
+              <p className="text-[13px] text-mute">{d}</p>
+            </div>
+          ))}
+        </div>
+        <p className={`mt-6 max-w-[62ch] text-[15px] text-ink/80 ${show(BEATS.drift)}`}>Each session leaves your own hands a little less steady. At {floor}%, Knack pauses streaming for a week so your own movement can come back.</p>
+
+        <div className={`mt-10 flex flex-col gap-5 border-t border-line pt-6 lg:flex-row lg:items-end lg:justify-between ${show(BEATS.offer)}`}>
+          <div className="max-w-[56ch]">
+            <div className="text-[17px] font-medium">Keep the {entry.kept}% for good</div>
+            <p className="mt-1 text-[14px] text-ink/75">A retention licence makes what stays legally yours.{expert ? ` ${expert} has agreed and gets 30%.` : ""} Keeping it any other way is blocked and reported.</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
             {entry.retained ? (
-              <p className="mt-3 flex items-center gap-2 text-[14px] text-ok"><Icon name="CheckCircle2" size={16} />Licensed. It's yours.</p>
+              <span className="flex items-center gap-2 text-[15px] text-ok"><Icon name="CheckCircle2" size={18} />Licensed. It's yours.</span>
             ) : buying ? (
-              <div className="mt-3 flex flex-wrap gap-2">
-                <button className="btn-primary" onClick={() => onDone({ retained: true, seen: false })}>Confirm · {inr(price)}</button>
-                <button className="btn-ghost" onClick={() => setBuying(false)}>Cancel</button>
-              </div>
+              <>
+                <button className="btn-ghost !py-3" onClick={() => setBuying(false)}>Cancel</button>
+                <button className="btn-ghost !py-3 !border-brass/60" onClick={() => onDone({ retained: true, seen: false })}>Confirm · {inr(price)}</button>
+              </>
             ) : (
-              <button className="btn-ghost mt-3 w-full" onClick={() => setBuying(true)}>Buy retention licence · {inr(price)}</button>
+              <button className="btn-ghost !py-3" onClick={() => setBuying(true)}>Keep it · {inr(price)}</button>
             )}
+            <button className="btn-primary !px-6 !py-3 !text-[15px]" onClick={() => onDone({})} autoFocus={done}>{entry.retained ? "Done" : "Let it fade"}<Icon name="ArrowRight" size={16} /></button>
           </div>
-          <button className="btn-primary" onClick={() => onDone({})}>{entry.retained ? "Done" : "Let it fade"}<Icon name="ArrowRight" size={16} /></button>
         </div>
       </div>
-    </Card>
+    </div>,
+    document.body
   );
 }
 
