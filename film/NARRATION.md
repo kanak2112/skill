@@ -31,7 +31,7 @@ shown. They are the same lines as the captions (`eight-days.srt`).
 | 2:20 | Session running | For one hour, her hands move like his. |
 | 2:24 | Card · One hour later | *(silence: let the debrief play)* |
 | 2:26 | Debrief | *(silence)* Chef Arjun Mehra's hands are leaving yours. |
-| 2:36 | Licence offer | Keeping what stays would cost about ₹70,000. |
+| 2:36 | Licence offer | Keeping the 13% that stays would cost ₹60,100. |
 | 2:41 | | She lets it fade. |
 | 2:45 | Card | Asha gets the job. Her employer can see every hour she streams. Her own hands, without the patch, are a little less steady than they were a week ago. |
 | 2:52 | Card | Who owns a skill once it has been in your hands? |
