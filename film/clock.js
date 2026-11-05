@@ -7,6 +7,9 @@
   let rafs = [];
   let timers = [];
   let nextId = 1;
+  // Repeatable randomness, so parallel slices of the film agree on order numbers and profiles.
+  let seed = 20351105;
+  Math.random = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
   performance.now = () => now;
   const RealDate = Date;
   Date.now = () => base + now;
