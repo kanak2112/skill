@@ -12,6 +12,16 @@ const fmtH = (mins) => {
   const h = Math.floor(mins / 60), m = Math.round(mins % 60);
   return h ? (m ? `${h} h ${m} min` : `${h} h`) : `${m} min`;
 };
+/* In-world clock: today's date and time, moved to 2035. Every date the story shows comes from here. */
+const WORLD_YEAR = 2035;
+const CLOCK_OFFSET = (() => { const t = new Date(), w = new Date(t); w.setFullYear(WORLD_YEAR); return w - t; })();
+const worldNow = () => Date.now() + CLOCK_OFFSET;
+const today = () => new Date(worldNow());
+
+/* Presenter mode hides the prototype controls; keyboard shortcuts drive the demo instead. */
+const PresentCtx = React.createContext(false);
+const Proto = ({ children }) => (React.useContext(PresentCtx) ? null : children);
+
 const shortDate = (d) => d.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" });
 const hashStr = (s) => [...s].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 2166136261);
 
@@ -58,7 +68,14 @@ const WORDS = {
 function parsePrompt(text) {
   const w = text.toLowerCase().match(/[a-z]+/g) || [];
   const hit = (table) => (table.find(([, keys]) => w.some((x) => keys.includes(x))) || [])[0];
-  return { shapeId: hit(WORDS.shape), finishId: hit(WORDS.color), coating: hit(WORDS.coat) };
+  const r = { shapeId: hit(WORDS.shape), finishId: hit(WORDS.color), coating: hit(WORDS.coat) };
+  // Nothing printable recognised: read the mood of the words and land on the nearest shell we can print.
+  if (!r.shapeId && !r.finishId && !r.coating && w.length) {
+    const h = hashStr(w.join(" "));
+    r.shapeId = SHAPES[h % SHAPES.length].id; r.finishId = FINISHES[(h >>> 4) % FINISHES.length].id; r.coating = COATINGS[(h >>> 8) % COATINGS.length].id;
+    r.guessed = true;
+  }
+  return r;
 }
 
 /* Freehand strokes (0–100 pad space) → centred, smoothed wire shape. */
@@ -105,7 +122,7 @@ const NODES = {
 const PRICING = { kit: 44900, shell: 4000 };
 const DELIVERY = [
   { id: "standard", name: "Standard", days: [5, 7], fee: 0, note: "Free · tracked courier" },
-  { id: "express", name: "Express", days: [2, 2], fee: 499, note: "Priority print and dispatch" },
+  { id: "drone", name: "Drone drop", days: [1, 1], fee: 499, note: "Next day, to your balcony or terrace pad" },
 ];
 const STATES = ["Andaman and Nicobar Islands", "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chandigarh", "Chhattisgarh", "Dadra and Nagar Haveli and Daman and Diu", "Delhi", "Goa", "Gujarat", "Haryana", "Himachal Pradesh", "Jammu and Kashmir", "Jharkhand", "Karnataka", "Kerala", "Ladakh", "Lakshadweep", "Madhya Pradesh", "Maharashtra", "Manipur", "Meghalaya", "Mizoram", "Nagaland", "Odisha", "Puducherry", "Punjab", "Rajasthan", "Sikkim", "Tamil Nadu", "Telangana", "Tripura", "Uttar Pradesh", "Uttarakhand", "West Bengal"];
 const STAGES = [
@@ -133,20 +150,12 @@ function validateAddress(a) {
   return e;
 }
 
-/* Skill classes from the original manual, plus monthly plans (20 stream hours each). */
-const CLASSES = {
-  base:     { name: "Base Motor",       mult: 1.5, risk: 0.6, fee: 340,  monthly: 4900,   desc: "Everyday movement: typing rhythm, walking correction, basic tool grip. From the Neural Stream™ Commons library." },
-  master:   { name: "Master Craftsman", mult: 3.0, risk: 1.4, fee: 2150, monthly: 29900,  desc: "Fine hand skills recorded from certified tradespeople: joinery, welding, knot-tying. The artisan is paid per minute." },
-  virtuoso: { name: "Virtuoso",         mult: 4.5, risk: 2.4, fee: 9800, monthly: 149000, desc: "Concert and theatre-grade precision. Needs 40 logged hours and a current clinical clearance." },
-};
-const PLAN_HOURS = 20;
-
 /* Baseline the patch records during calibration. Prototype values come from the patch ID and
    wearing spot, so the same patch always measures the same. */
 function measureBaseline(serial, node) {
   const h = hashStr(`${serial}:${node}`);
   const pick = (shift, min, span) => min + ((h >>> shift) % (span + 1));
-  return { at: new Date().toISOString(), node, steadiness: pick(0, 58, 34), response: pick(5, 180, 90), endurance: pick(11, 35, 85) };
+  return { at: today().toISOString(), node, steadiness: pick(0, 58, 34), response: pick(5, 180, 90), endurance: pick(11, 35, 85) };
 }
 const logged = (history = []) => history.reduce((a, s) => a + s.minutes, 0);
 
@@ -196,12 +205,19 @@ function shellCanvas(shape, color, coating) {
   g.addColorStop(0, coating === "matte" ? color : "#ffffff");
   g.addColorStop(0.3, color);
   g.addColorStop(1, "#0b0f17");
+  const paint = (style) => {
+    if (shape.mode === "stroke") { ctx.lineWidth = shape.width || 9; ctx.lineCap = shape.cap || "round"; ctx.lineJoin = "round"; ctx.strokeStyle = style; ctx.stroke(path); }
+    else { ctx.fillStyle = style; ctx.fill(path); }
+  };
+  // Contact shadow on the skin, then the printed side wall, so the shell reads as a 3.4 mm object.
+  ctx.save(); ctx.shadowColor = "rgba(0,0,0,.75)"; ctx.shadowBlur = 14; ctx.shadowOffsetX = 6; ctx.shadowOffsetY = 9;
+  paint("rgba(0,0,0,.55)"); ctx.restore();
+  ctx.save();
+  for (let i = 3; i >= 1; i--) { ctx.translate(i === 3 ? 1.5 : -0.5, i === 3 ? 2 : -0.67); paint(i === 3 ? "#05070b" : "#151a24"); }
+  ctx.restore();
   ctx.shadowColor = color;
-  ctx.shadowBlur = coating === "matte" ? 2 : 6;
-  if (shape.mode === "stroke") {
-    ctx.lineWidth = shape.width || 9; ctx.lineCap = shape.cap || "round"; ctx.lineJoin = "round";
-    ctx.strokeStyle = g; ctx.stroke(path);
-  } else { ctx.fillStyle = g; ctx.fill(path); }
+  ctx.shadowBlur = coating === "matte" ? 1 : 3;
+  paint(g);
   if (coating !== "matte") {
     ctx.shadowBlur = 0; ctx.globalCompositeOperation = "source-atop";
     ctx.strokeStyle = `rgba(255,255,255,${coating === "gloss" ? 0.6 : 0.3})`; ctx.lineWidth = 1.2;
@@ -212,7 +228,7 @@ function shellCanvas(shape, color, coating) {
   tex.anisotropy = 4;
   return tex;
 }
-/** The bare DS-28 patch: a small rounded rectangle, graphite body with a brass rim. */
+/** The bare Knack patch: a small rounded rectangle, graphite body with a brass rim. */
 function patchCanvas() {
   const size = 512, c = document.createElement("canvas");
   c.width = c.height = size;
@@ -297,6 +313,7 @@ function HeadStage({ shape, color, coating, node, autoTurn, photo, frame, hero =
     controls.minPolarAngle = Math.PI * 0.25; controls.maxPolarAngle = Math.PI * 0.68;
     controls.autoRotateSpeed = -1.2;
     let pausedUntil = 0, tween = null, frameName = null, frameScale = 1;
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
     // In the hero the head never stops turning: dragging just adds to the spin.
     const isHero = () => !!(api.current.props && api.current.props.hero);
     controls.addEventListener("start", () => { tween = null; if (!isHero()) pausedUntil = Infinity; });
@@ -437,14 +454,30 @@ function HeadStage({ shape, color, coating, node, autoTurn, photo, frame, hero =
         prof.push(new THREE.Vector2(r, t * L));
       }
       prof.push(new THREE.Vector2(0.0001, L + 0.01));
-      const fore = new THREE.Mesh(new THREE.LatheGeometry(prof, 48), new THREE.MeshPhysicalMaterial({ color: "#d7a68d", ...skin }));
+      // Skin for the arm: blotchy colour plus fine pores, so it holds up next to the scanned head.
+      const skinTex = (() => {
+        const c = document.createElement("canvas"); c.width = c.height = 256;
+        const x = c.getContext("2d");
+        x.fillStyle = "#c99580"; x.fillRect(0, 0, 256, 256);
+        for (let i = 0; i < 90; i++) { x.fillStyle = `rgba(${150 + Math.random() * 60},${90 + Math.random() * 40},${80 + Math.random() * 30},.08)`; x.beginPath(); x.arc(Math.random() * 256, Math.random() * 256, 8 + Math.random() * 30, 0, 7); x.fill(); }
+        const bump = document.createElement("canvas"); bump.width = bump.height = 256;
+        const y = bump.getContext("2d"); y.fillStyle = "#808080"; y.fillRect(0, 0, 256, 256);
+        for (let i = 0; i < 5000; i++) { const v = 90 + Math.random() * 80; y.fillStyle = `rgb(${v},${v},${v})`; y.fillRect(Math.random() * 256, Math.random() * 256, 1.2, 1.2); }
+        const t1 = new THREE.CanvasTexture(c), t2 = new THREE.CanvasTexture(bump);
+        t1.encoding = THREE.sRGBEncoding;
+        [t1, t2].forEach((t) => { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(3, 2); });
+        return { map: t1, bumpMap: t2 };
+      })();
+      const fore = new THREE.Mesh(new THREE.LatheGeometry(prof, 48), new THREE.MeshPhysicalMaterial({ ...skin, ...skinTex, bumpScale: 0.0015, color: "#f2d2c4" }));
       fore.scale.set(1, 1, 0.78);
       const hand = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 20), fore.material);
       hand.scale.set(0.042, 0.075, 0.028); hand.position.set(0, L + 0.06, 0.004);
       const elbow = new THREE.Mesh(new THREE.SphereGeometry(0.05, 24, 16), fore.material);
       elbow.scale.set(1, 1, 0.78);
       arm = new THREE.Group();
-      arm.add(fore, hand, elbow);
+      const sleeve = new THREE.Mesh(new THREE.CylinderGeometry(0.066, 0.07, 0.12, 40, 1, true), new THREE.MeshStandardMaterial({ color: "#121826", roughness: 0.95, envMapIntensity: 0.3, side: THREE.DoubleSide }));
+      sleeve.scale.set(1, 1, 0.82); sleeve.position.y = -0.03;
+      arm.add(fore, hand, elbow, sleeve);
       arm.position.set(0.22, -0.46, 0.26);
       arm.rotation.set(-0.1, 0.25, 0.95);
       arm.visible = false;
@@ -479,7 +512,7 @@ function HeadStage({ shape, color, coating, node, autoTurn, photo, frame, hero =
         camera.position.lerpVectors(tween.fromPos, tween.toPos, t);
         if (t >= 1) tween = null;
       }
-      controls.autoRotate = !!(api.current.props && api.current.props.autoTurn) && !tween && now > pausedUntil;
+      controls.autoRotate = !!(api.current.props && api.current.props.autoTurn) && !tween && now > pausedUntil && !reduceMotion.matches;
       controls.update();
       rig.quaternion.copy(camera.quaternion);
       if (decal && current) {
@@ -549,9 +582,9 @@ function Header({ view, setView, order, overlay }) {
   return (
     <header className={`${overlay ? "absolute inset-x-0 top-0 bg-gradient-to-b from-slate0/80 to-transparent" : "sticky border-b border-line bg-slate0/90 backdrop-blur"} z-40`} style={{ top: "env(safe-area-inset-top, 0px)" }}>
       <div className="mx-auto max-w-6xl px-4 sm:px-6 py-3 flex flex-wrap items-center gap-x-6 gap-y-2 justify-between">
-        <button className="flex items-center gap-3 min-w-0" onClick={() => setView("home")} aria-label="Neural Stream DS-28 home">
+        <button className="flex items-center gap-3 min-w-0" onClick={() => setView("home")} aria-label="Knack home">
           <div className="h-8 w-8 rounded-full border border-brass/50 grid place-items-center text-brass shrink-0"><Icon name="Waves" size={16} /></div>
-          <span className="text-[15px] font-medium text-ink truncate">Neural Stream™ <span className="text-brass">DS-28</span></span>
+          <span className="text-[17px] font-medium tracking-tight text-ink truncate">knack<span className="text-brass">.</span></span>
         </button>
         <nav className="flex items-center gap-1 overflow-x-auto" aria-label="Main">
           {VIEWS.map(([id, label]) => (
@@ -583,8 +616,8 @@ function Home({ design, order, onStart, onManual }) {
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-slate0 via-slate0/70 to-transparent" />
       <div className="pointer-events-none absolute inset-x-0 bottom-0">
         <div className="mx-auto max-w-6xl px-4 sm:px-6 pb-10 sm:pb-14">
-          <Label>Neural Stream™ DS-28</Label>
-          <h1 className="mt-3 text-[40px] sm:text-[64px] font-medium tracking-tight leading-[1.02] max-w-[14ch]">Wear your motor intent.</h1>
+          <Label>Knack · skills by the hour · {WORLD_YEAR}</Label>
+          <h1 className="mt-3 text-[40px] sm:text-[64px] font-medium tracking-tight leading-[1.02] max-w-[14ch]">Get the knack.</h1>
           <p className="mt-4 text-[16px] sm:text-[17px] text-ink/75 max-w-[48ch] leading-relaxed">A skin patch that lets you borrow an expert's hand skills by the hour. You design the shell it wears.</p>
           <div className="pointer-events-auto mt-7 flex flex-wrap items-center gap-3">
             <button onClick={start} className="btn-primary !px-7 !py-4 !text-[16px] shadow-[0_0_40px_rgba(226,177,104,.35)]">Get yours now<Icon name="ArrowRight" size={18} /></button>
@@ -631,6 +664,10 @@ function SketchPad({ onShape }) {
 function PhotoPanel({ photo, setPhoto }) {
   const input = useRef(null);
   const [error, setError] = useState("");
+  const [asking, setAsking] = useState(false);
+  const [agreed, setAgreed] = useState(false);
+  const [share, setShare] = useState(false);
+  const choose = () => (agreed ? input.current.click() : setAsking(true));
   const load = (file) => {
     if (!file) return;
     if (!file.type.startsWith("image/")) { setError("That file isn't a photo. Choose a JPG or PNG."); return; }
@@ -657,13 +694,30 @@ function PhotoPanel({ photo, setPhoto }) {
   return (
     <div className="rounded-xl border border-brass/40 bg-brass/5 p-4">
       <input ref={input} type="file" accept="image/*" className="hidden" onChange={(e) => { load(e.target.files[0]); e.target.value = ""; }} />
-      {!photo ? (
+      {!photo && asking ? (
+        <div className="fade-in" role="group" aria-labelledby="face-consent">
+          <div id="face-consent" className="flex items-center gap-2 text-[15px] font-medium"><Icon name="ScanFace" size={18} className="text-brass" />Before you add your face</div>
+          <ul className="mt-3 grid gap-1.5 text-[13px] text-ink/80">
+            <li className="flex gap-2"><Icon name="Check" size={14} className="mt-0.5 shrink-0 text-ok" />Used only to draw this preview, on this device.</li>
+            <li className="flex gap-2"><Icon name="Check" size={14} className="mt-0.5 shrink-0 text-ok" />Deleted when you close the page. Never used to train a model.</li>
+            <li className="flex gap-2"><Icon name="Check" size={14} className="mt-0.5 shrink-0 text-ok" />Not linked to your Knack account or your motor profile.</li>
+          </ul>
+          <label className="mt-3 flex cursor-pointer items-start gap-2.5 rounded-lg border border-line bg-slate0 p-3 text-[13px] text-mute">
+            <input type="checkbox" checked={share} onChange={(e) => setShare(e.target.checked)} className="mt-0.5 accent-[#E2B168]" />
+            <span>Optional: share my face scan with Knack fit partners for ₹500 off. They keep it for 3 years.</span>
+          </label>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button className="btn-primary" onClick={() => { setAgreed(true); setAsking(false); input.current.click(); }}>Agree and choose a photo</button>
+            <button className="btn-ghost" onClick={() => setAsking(false)}>Not now</button>
+          </div>
+        </div>
+      ) : !photo ? (
         <div className="flex flex-wrap items-center gap-3">
           <div className="min-w-0 flex-1">
             <div className="text-[15px] font-medium">See it on your own face</div>
-            <div className="text-[13px] text-mute">A front-facing photo works best. It stays on this device.</div>
+            <div className="text-[13px] text-mute">A front-facing photo works best. You'll see how it's used before you choose one.</div>
           </div>
-          <button className="btn-primary" onClick={() => input.current.click()}><Icon name="Camera" size={16} />Upload your photo</button>
+          <button className="btn-primary" onClick={choose}><Icon name="Camera" size={16} />Upload your photo</button>
         </div>
       ) : (
         <div>
@@ -671,7 +725,7 @@ function PhotoPanel({ photo, setPhoto }) {
             <img src={photo.preview} alt="Your uploaded photo" className="h-14 w-14 rounded-lg object-cover border border-line" />
             <div className="min-w-0 flex-1">
               <div className="text-[15px] font-medium">Your photo is on the model</div>
-              <div className="text-[13px] text-mute">Line up your eyes and nose with the model's.</div>
+              <div className="text-[13px] text-mute">Line up your eyes and nose with the model's.{share ? " Shared with fit partners." : " On this device only."}</div>
             </div>
             <button className="btn-ghost" onClick={() => setPhoto(null)} aria-label="Remove photo"><Icon name="Trash2" size={14} />Remove</button>
           </div>
@@ -703,10 +757,15 @@ function Studio({ design, setDesign, onBuy, photo, setPhoto }) {
   const frame = photo && design.node === "temple" ? "face" : design.node;
   useEffect(() => { if (photo) setAutoTurn(false); }, [!!photo]);
 
+  const [thinking, setThinking] = useState(false);
   const create = (value = text) => {
-    const r = parsePrompt(value);
-    set({ prompt: value, ...(r.shapeId && { shape: findShape(r.shapeId) }), ...(r.finishId && { finish: r.finishId }), ...(r.coating && { coating: r.coating }) });
-    setHeard(r);
+    if (thinking || !value.trim()) return;
+    setThinking(true); setHeard(null);
+    setTimeout(() => {
+      const r = parsePrompt(value);
+      set({ prompt: value, ...(r.shapeId && { shape: findShape(r.shapeId) }), ...(r.finishId && { finish: r.finishId }), ...(r.coating && { coating: r.coating }) });
+      setHeard(r); setThinking(false);
+    }, 850);
   };
 
   return (
@@ -756,16 +815,17 @@ function Studio({ design, setDesign, onBuy, photo, setPhoto }) {
                   <div className="mt-2 flex gap-2">
                     <input id="prompt" value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && create()}
                       className="field flex-1 min-w-0" placeholder="A glossy crimson heart" />
-                    <button className="btn-primary px-4" onClick={() => create()}><Icon name="Sparkles" size={16} />Create</button>
+                    <button className="btn-primary px-4" onClick={() => create()} disabled={thinking}><Icon name="Sparkles" size={16} className={thinking ? "animate-spin" : ""} />{thinking ? "Shaping…" : "Create"}</button>
                   </div>
                   <div className="mt-3 flex flex-wrap gap-2">
                     {PROMPTS.map((p) => <button key={p} className="chip" onClick={() => { setText(p); create(p); }}>{p}</button>)}
                   </div>
+                  {thinking && <p className="mt-3 text-[13px] text-brass" aria-live="polite">Reading your description and checking it can be printed at 18 mm…</p>}
                   {heard && (
-                    <p className="mt-3 text-[13px] text-mute">
-                      {heard.shapeId || heard.finishId || heard.coating
-                        ? <>Changed: {[heard.shapeId && findShape(heard.shapeId).name, heard.finishId && findFinish(heard.finishId).name, heard.coating && COATINGS.find((c) => c.id === heard.coating).name].filter(Boolean).join(" · ")}. Anything you didn't mention stays the same.</>
-                        : "We didn't spot a shape, colour or finish. Try words like heart, tear drop, gold or matte."}
+                    <p className="mt-3 text-[13px] text-mute" aria-live="polite">
+                      {heard.guessed ? "We can't print that exactly, so we made the closest shell we can: " : "Changed: "}
+                      {[heard.shapeId && findShape(heard.shapeId).name, heard.finishId && findFinish(heard.finishId).name, heard.coating && COATINGS.find((c) => c.id === heard.coating).name].filter(Boolean).join(" · ")}.
+                      {heard.guessed ? " Try naming a shape, colour or finish to steer it." : " Anything you didn't mention stays the same."}
                     </p>
                   )}
                 </div>
@@ -893,7 +953,7 @@ function Checkout({ design, order, onPlace, onManual }) {
             <h2 className="text-xl font-medium tracking-tight">Shipping speed</h2>
             <div className="mt-4 grid sm:grid-cols-2 gap-2" role="radiogroup" aria-label="Shipping speed">
               {DELIVERY.map((d) => {
-                const [f, t] = deliveryWindow(d.id, new Date());
+                const [f, t] = deliveryWindow(d.id, today());
                 const on = speed === d.id;
                 return (
                   <button type="button" key={d.id} role="radio" aria-checked={on} onClick={() => setSpeed(d.id)}
@@ -914,21 +974,22 @@ function Checkout({ design, order, onPlace, onManual }) {
             <div className="text-[14px]"><div>{design.shape.name} shell</div><div className="text-mute text-[13px]">{finish.name} · {COATINGS.find((c) => c.id === design.coating).name} · {NODES[design.node].name}</div></div>
           </div>
           <dl className="mt-5 grid gap-2.5 text-[14px]">
-            <div className="flex justify-between"><dt className="text-ink/80">DS-28 starter kit</dt><dd className="tnum">{inr(PRICING.kit)}</dd></div>
+            <div className="flex justify-between"><dt className="text-ink/80">Knack patch starter kit</dt><dd className="tnum">{inr(PRICING.kit)}</dd></div>
             <div className="flex justify-between"><dt className="text-ink/80">Printed shell</dt><dd className="tnum">{inr(PRICING.shell)}</dd></div>
             <div className="flex justify-between"><dt className="text-ink/80">{del.name} shipping</dt><dd className="tnum">{del.fee ? inr(del.fee) : "Free"}</dd></div>
             <div className="flex justify-between border-t border-line pt-3 text-[18px] font-medium"><dt>Total</dt><dd className="tnum">{inr(total)}</dd></div>
           </dl>
-          <p className="mt-1 text-[12px] text-mute">GST included. Skill streams are paid separately after your patch arrives.</p>
+          <p className="mt-1 text-[12px] text-mute">GST included. The patch is yours to keep. Skills are rented by the hour once it arrives: without a skill plan the patch can read your muscles, but it can't stream to them.</p>
+          <p className="mt-2 text-[11.5px] text-mute/80">Approved under the Neural Interface Devices Rules, 2033 · CDSCO licence NID-B/2291</p>
           <div className="mt-5 text-[13px] text-mute">Pay with</div>
           <div className="mt-2 grid grid-cols-3 gap-2" role="radiogroup" aria-label="Payment method">
-            {[["upi", "UPI", "QrCode"], ["card", "Card", "CreditCard"], ["cod", "On delivery", "Banknote"]].map(([id, label, icon]) => (
+            {[["upi", "UPI", "QrCode"], ["erupee", "e₹ wallet", "Wallet"], ["card", "Card", "CreditCard"]].map(([id, label, icon]) => (
               <button type="button" key={id} role="radio" aria-checked={pay === id} onClick={() => setPay(id)}
                 className={`flex flex-col items-center gap-1 rounded-xl border py-3 text-[12px] transition-colors ${pay === id ? "border-brass/60 bg-slate0 text-ink" : "border-line text-mute hover:text-ink"}`}><Icon name={icon} size={18} />{label}</button>
             ))}
           </div>
           <button type="submit" className="btn-primary w-full mt-5 py-3 text-[15px]">Place order · {inr(total)}</button>
-          <p className="mt-2 text-[12px] text-mute">Prototype: no payment is taken and no payment details are asked for.</p>
+          <Proto><p className="mt-2 text-[12px] text-mute">Prototype: no payment is taken and no payment details are asked for.</p></Proto>
         </Card>
       </form>
     </main>
@@ -968,7 +1029,7 @@ function Tabs({ tab, setTab, status }) {
 }
 
 /** Prototype controls: kept visibly separate so testers can jump states without confusing buyers. */
-function DevBar({ order, setOrder, onDemo }) {
+function DevBar({ order, setOrder, onDemo, onReset, onPresent }) {
   const status = statusOf(order);
   const paired = status === "PAIRED";
   return (
@@ -1001,12 +1062,18 @@ function DevBar({ order, setOrder, onDemo }) {
         ) : (
           <><span className="text-mute">No order yet.</span><button className="btn-ghost !py-1" onClick={onDemo}>Create a demo order</button></>
         )}
+        <span className="ml-auto flex flex-wrap items-center gap-2">
+          <button className="btn-ghost !py-1" onClick={onReset}><Icon name="RotateCcw" size={13} />Start over</button>
+          <button className="btn-ghost !py-1" onClick={onPresent}><Icon name="Presentation" size={13} />Presenter mode</button>
+        </span>
       </div>
     </div>
   );
 }
 
-function LockedPanel({ tab, order, setTab, setOrder }) {
+function LockedPanel({ tab, order, setTab, setOrder, wishlist, setWishlist }) {
+  const [saved, setSaved] = useState(false);
+  const Picker = window.SkillVault && window.SkillVault.SkillPicker;
   const status = statusOf(order);
   const what = {
     onboard: "Setup and calibration need the patch in your hands.",
@@ -1021,13 +1088,13 @@ function LockedPanel({ tab, order, setTab, setOrder }) {
         <h2 className="mt-4 text-2xl font-medium tracking-tight">Unlocks when your patch arrives</h2>
         <p className="mt-2 text-[15px] text-ink/70 leading-relaxed max-w-[56ch]">
           {what}{" "}
-          {status === "NO_ORDER" && "Order your DS-28 to get started."}
+          {status === "NO_ORDER" && "Order your Knack patch to get started."}
           {status === "IN_TRANSIT" && `Your patch should arrive by ${by}. This opens as soon as it's delivered.`}
         </p>
         {status === "IN_TRANSIT" && (
-          <button className="btn-ghost mt-4 !border-warn/40 text-warn" onClick={() => setOrder((o) => ({ ...o, stage: STAGES.length - 1 }))}>
+          <Proto><button className="btn-ghost mt-4 !border-warn/40 text-warn" onClick={() => setOrder((o) => ({ ...o, stage: STAGES.length - 1 }))}>
             <Icon name="Wrench" size={14} />Prototype: mark as delivered
-          </button>
+          </button></Proto>
         )}
         <p className="mt-4 text-[14px] text-ink/70">While you wait, you can read:</p>
         <div className="mt-3 flex flex-wrap gap-2">
@@ -1036,6 +1103,15 @@ function LockedPanel({ tab, order, setTab, setOrder }) {
           <button className="btn-ghost" onClick={() => setTab("safety")}><Icon name="ShieldAlert" size={14} />Safety guide</button>
         </div>
       </Card>
+      {tab === "sessions" && Picker && (
+        <div className="mt-6">
+          <Label>While you wait</Label>
+          <h2 className="mt-2 text-2xl font-medium tracking-tight">Start a wishlist</h2>
+          <p className="mt-1 mb-4 text-[15px] text-ink/70 max-w-[60ch]">Browse the skill vault now. What you save is already picked when your patch arrives.</p>
+          {saved && <p className="mb-3 flex items-center gap-2 text-[14px] text-ok" aria-live="polite"><Icon name="CheckCircle2" size={16} />Saved {wishlist.length} skill{wishlist.length === 1 ? "" : "s"}. They'll be waiting in your plan.</p>}
+          <Picker wishlist selected={wishlist} onChange={(w) => { setWishlist(w); setSaved(false); }} onDone={() => { setSaved(true); window.scrollTo({ top: 0, behavior: "smooth" }); }} />
+        </div>
+      )}
     </div>
   );
 }
@@ -1050,13 +1126,17 @@ function PairForm({ order, setOrder }) {
     if (norm(code) !== norm(order.serial)) { setErr("That ID doesn't match this order. It's printed on the card inside the box lid."); return; }
     setErr(""); setOrder((o) => ({ ...o, paired: true }));
   };
+  const [tapping, setTapping] = useState(false);
+  const tap = () => { setTapping(true); setTimeout(() => { setTapping(false); setOrder((o) => ({ ...o, paired: true })); }, 1400); };
   return (
     <form onSubmit={pair} className="mt-4 grid gap-2" noValidate>
+      <button type="button" className="btn-primary" onClick={tap} disabled={tapping}><Icon name="Nfc" size={16} />{tapping ? "Hold still… reading the box lid" : "Tap your phone on the box lid"}</button>
+      <p className="mt-2 text-center text-[12px] text-mute">or type the patch ID printed inside the lid</p>
       <label htmlFor="pair" className="text-[13px]">Patch ID</label>
-      <input id="pair" value={code} onChange={(e) => setCode(e.target.value)} placeholder="DS28-XXX-000" autoComplete="off" aria-invalid={!!err} className={`field uppercase ${err ? "border-crit" : ""}`} />
+      <input id="pair" value={code} onChange={(e) => setCode(e.target.value)} placeholder="KN-XXX-000" autoComplete="off" aria-invalid={!!err} className={`field uppercase ${err ? "border-crit" : ""}`} />
       {err && <p className="text-[12px] text-crit">{err}</p>}
-      <button className="btn-primary mt-1" type="submit"><Icon name="Link" size={16} />Pair patch</button>
-      <p className="text-[12px] text-mute">Prototype hint: your ID is {order.serial}.</p>
+      <button className="btn-ghost mt-1" type="submit"><Icon name="Link" size={16} />Pair with ID</button>
+      <Proto><p className="text-[12px] text-mute">Prototype hint: your ID is {order.serial}.</p></Proto>
     </form>
   );
 }
@@ -1133,7 +1213,7 @@ function OrderTracking({ order, setOrder, onStudio, setTab }) {
           <address className="mt-4 not-italic text-[14px] text-ink/80 leading-relaxed">
             {order.address.name}<br />{order.address.street}{order.address.area && `, ${order.address.area}`}<br />{order.address.city}, {order.address.state} {order.address.pin}
           </address>
-          <div className="mt-3 text-[13px] text-mute">{order.pay === "cod" ? "To pay on delivery" : "Paid"} {inr(order.total)} · {del.name} shipping</div>
+          <div className="mt-3 text-[13px] text-mute">Paid {inr(order.total)} on {day(order.placedAt)} · {del.name}</div>
         </Card>
       </div>
     </div>
@@ -1150,9 +1230,10 @@ const PREP = [
 ];
 const PHASES = [
   { at: 0, msg: "Checking skin contact" },
-  { at: 0.34, msg: "Listening to your muscles" },
+  { at: 0.2, msg: "Listening to your muscles at rest" },
+  { at: 0.45, msg: "Sending a test pulse. You may feel a faint tingle." },
   { at: 0.7, msg: "Measuring your baseline" },
-  { at: 1, msg: "Done. Your baseline is saved." },
+  { at: 1, msg: "Done. Your baseline is saved, with today's margin of error." },
 ];
 
 function Calibration({ order, setOrder, setTab, inJourney }) {
@@ -1161,7 +1242,7 @@ function Calibration({ order, setOrder, setTab, inJourney }) {
   const [holding, setHolding] = useState(false);
   const [aborted, setAborted] = useState(false);
   const raf = useRef(0), start = useRef(0), pv = useRef(p);
-  const DURATION = 3000;
+  const DURATION = 5000;
   const node = NODES[order.design.node];
 
   const tick = useCallback((now) => {
@@ -1212,7 +1293,7 @@ function Calibration({ order, setOrder, setTab, inJourney }) {
         ) : (<>
         <Label>Step 2 · Calibrate on your {node.name.toLowerCase()}</Label>
         <h2 className="mt-2 text-xl font-medium tracking-tight">Hold to calibrate</h2>
-        <p className="mt-1 text-[14px] text-ink/70 leading-relaxed">Sit still, relax your jaw, and hold the ring for 3 seconds. The patch measures your baseline while you hold.</p>
+        <p className="mt-1 text-[14px] text-ink/70 leading-relaxed">Sit still, relax your jaw, and hold the ring for 5 seconds. The patch sends one small test pulse and measures how your muscles answer.</p>
         <div className="my-6 grid place-items-center">
           <button
             onPointerDown={(e) => { e.currentTarget.setPointerCapture?.(e.pointerId); begin(); }}
@@ -1220,7 +1301,7 @@ function Calibration({ order, setOrder, setTab, inJourney }) {
             onKeyDown={(e) => { if ((e.key === " " || e.key === "Enter") && !e.repeat) { e.preventDefault(); begin(); } }}
             onKeyUp={(e) => { if (e.key === " " || e.key === "Enter") end(); }}
             onContextMenu={(e) => e.preventDefault()}
-            aria-label={done ? "Calibration complete" : "Press and hold for 3 seconds to calibrate"}
+            aria-label={done ? "Calibration complete" : "Press and hold for 5 seconds to calibrate"}
             className="relative h-[220px] w-[220px] max-w-full rounded-full select-none touch-none" style={{ WebkitTouchCallout: "none" }}>
             <svg viewBox="0 0 200 200" className="absolute inset-0 h-full w-full -rotate-90">
               <circle cx="100" cy="100" r={R} fill="none" strokeWidth="6" className="ring-track" />
@@ -1241,12 +1322,12 @@ function Calibration({ order, setOrder, setTab, inJourney }) {
         </div>
         <div className="rounded-xl bg-slate0 border border-line p-3" aria-live="polite">
           <div className={`text-[14px] ${done ? "text-ok" : aborted ? "text-warn" : "text-ink"}`}>
-            {aborted ? "Released too early. Hold for the full 3 seconds." : holding || done ? phase.msg : "Waiting for you to press and hold."}
+            {aborted ? "Released too early. Hold for the full 5 seconds." : holding || done ? phase.msg : "Waiting for you to press and hold."}
           </div>
         </div>
         {done && b && (
           <div className="mt-3 rounded-xl border border-line p-3 text-[13px] text-ink/80">
-            Saved: steadiness {b.steadiness}%, reaction {(b.response / 1000).toFixed(2)} s, stamina {b.endurance} min.
+            Saved: steadiness {b.steadiness}% (±4), reaction {(b.response / 1000).toFixed(2)} s (±0.03), stamina {b.endurance} min (±8). One reading is a rough guide; it firms up over your first week.
             {!inJourney && <button className="ml-1 text-brass underline underline-offset-2" onClick={() => setTab("sessions")}>See your sessions</button>}
           </div>
         )}
@@ -1258,7 +1339,7 @@ function Calibration({ order, setOrder, setTab, inJourney }) {
 }
 
 /* ───────────── Profile ───────────── */
-/* Your Neural Stream account profile, calibrated online before you ordered: a 12-minute at-home
+/* Your Knack account profile, calibrated online before you ordered: a 12-minute at-home
    test using a phone camera and screen. Prototype values come from your name and order, so they
    stay the same for the same order. */
 function onlineProfile(order) {
@@ -1271,10 +1352,26 @@ function onlineProfile(order) {
     recovery: ["Quick", "Average", "Slow"][h % 3],
   };
 }
-/* The patch's own reading replaces the online estimate once you've set it up. */
+/* Where the online profile came from. All four are switched on when you first see them; switching
+   one off is allowed, but each has a consequence the plan shows. */
+const SOURCES = [
+  { id: "phone", name: "Phone check", icon: "Smartphone", got: "A 12-minute hold-still, tapping and reaction test you did at home before ordering", sees: "Only Knack", required: true },
+  { id: "abha", name: "ABHA health record", icon: "HeartPulse", got: "Past hand and arm injuries, and medicines that affect movement", sees: "Knack's clinical team", off: "Without it, first sessions are kept 15 minutes shorter until your patch has a week of readings" },
+  { id: "ring", name: "Smart ring, last 90 days", icon: "Watch", got: "Sleep and resting heart rate, used to estimate how quickly you recover", sees: "Only Knack", off: "Without it, recovery is assumed to be slow" },
+  { id: "employer", name: "Employer wellness programme", icon: "Building2", got: "Your job role and the skills your team uses", sees: "Your employer sees which skills you stream and for how long", on: "Your employer pays 20% of your plan" },
+];
+const DEFAULT_SHARED = { phone: true, abha: true, ring: true, employer: true };
+const EMPLOYER_SHARE = 0.2;
+
+/* The patch's own reading replaces the online estimate once you've set it up. Every session also
+   nudges your own unassisted steadiness, which the profile keeps count of. */
 function currentProfile(order) {
   const online = onlineProfile(order);
-  return order.baseline ? { ...online, ...order.baseline, source: "patch", onlineAt: online.at } : online;
+  const shared = { ...DEFAULT_SHARED, ...(order.consent || {}) };
+  if (!shared.ring) online.recovery = "Slow";
+  const p = order.baseline ? { ...online, ...order.baseline, source: "patch", onlineAt: online.at } : online;
+  const drift = (order.history || []).reduce((a, h) => a + (h.drift || 0), 0);
+  return { ...p, startSteadiness: p.steadiness, steadiness: p.steadiness - drift, drift, shared };
 }
 
 /* ───────────── Personalised plan ───────────── */
@@ -1286,7 +1383,8 @@ const BUNDLE_HOURS = 6, BUNDLE_OFF = 0.15;
 /* One plan line per chosen skill. Every rule is returned with its result so the screen can show why. */
 function planFor(ids, p, node, sessionsById = {}) {
   const staminaCap = Math.max(30, Math.floor((p.endurance * 2) / 15) * 15);
-  const firstCap = p.recovery === "Slow" ? 45 : 60;
+  const shared = p.shared || DEFAULT_SHARED;
+  const firstCap = (p.recovery === "Slow" ? 45 : 60) - (shared.abha ? 0 : 15);
   const items = ids.map(findModel).filter(Boolean).map((m) => {
     const why = [];
     let len = Math.min(m.maxHours * 60, staminaCap, 120);
@@ -1300,7 +1398,7 @@ function planFor(ids, p, node, sessionsById = {}) {
       why.push({ ok: false, text: `Shorter sessions: mixed-expert skills feel less familiar at your steadiness (${p.steadiness}%)` });
     }
     const first = Math.min(len, firstCap);
-    why.push({ ok: true, text: `Your first session is ${fmtH(first)}${p.recovery === "Slow" ? " because you recover slowly" : ""}, then ${fmtH(len)}` });
+    why.push({ ok: true, text: `Your first session is ${fmtH(first)}${p.recovery === "Slow" ? (shared.ring ? " because you recover slowly" : " because, without your ring data, recovery is assumed to be slow") : ""}${shared.abha ? "" : " (15 min shorter without your health record)"}, then ${fmtH(len)}` });
     if (m.domain === "physical" && node === "temple") why.push({ ok: false, text: "Physical skills read best with the patch on your forearm or neck" });
     if (m.waitMins) why.push({ ok: false, text: `Has a waiting list (about ${fmtH(m.waitMins)}), so book ahead` });
     const sessions = sessionsById[m.id] || (m.domain === "cognitive" ? 3 : 4);
@@ -1310,10 +1408,13 @@ function planFor(ids, p, node, sessionsById = {}) {
   const hours = items.reduce((a, i) => a + i.minutes / 60, 0);
   const payg = items.reduce((a, i) => a + i.cost, 0);
   const bundle = hours >= BUNDLE_HOURS;
-  const total = bundle ? payg * (1 - BUNDLE_OFF) : payg;
-  const billingWhy = bundle
+  const afterBundle = bundle ? payg * (1 - BUNDLE_OFF) : payg;
+  const employer = shared.employer ? afterBundle * EMPLOYER_SHARE : 0;
+  const total = afterBundle - employer;
+  const billingWhy = (bundle
     ? [{ ok: true, text: `${hours.toFixed(1)} h in your first month is over ${BUNDLE_HOURS} h, so the first-month bundle saves ${Math.round(BUNDLE_OFF * 100)}% (${inr(payg - total)})` }]
-    : [{ ok: false, text: `${hours.toFixed(1)} h is under ${BUNDLE_HOURS} h, so paying per session is best. Add sessions to unlock the ${Math.round(BUNDLE_OFF * 100)}% bundle.` }];
+    : [{ ok: false, text: `${hours.toFixed(1)} h is under ${BUNDLE_HOURS} h, so paying per session is best. Add sessions to unlock the ${Math.round(BUNDLE_OFF * 100)}% bundle.` }])
+    .concat(shared.employer ? [{ ok: false, text: `Your employer pays ${Math.round(EMPLOYER_SHARE * 100)}% (${inr(employer)}) and can see which skills you stream and for how long` }] : []);
 
   // Spread sessions over four weeks: a light first week, then evenly, never two of the same skill on one day.
   const queue = [];
@@ -1322,7 +1423,7 @@ function planFor(ids, p, node, sessionsById = {}) {
   const weekCap = [Math.min(3, queue.length), ...Array(3).fill(Math.ceil(Math.max(0, queue.length - 3) / 3))];
   const weeks = weekCap.map((n) => queue.splice(0, n));
   if (queue.length) weeks[3].push(...queue);
-  return { items, hours, payg, bundle, total, billingWhy, weeks };
+  return { items, hours, payg, afterBundle, employer, bundle, total, billingWhy, weeks };
 }
 
 /* ───────────── Shared bits ───────────── */
@@ -1347,7 +1448,7 @@ const Spark = ({ values }) => (
 const Rule = ({ ok, text }) => (
   <li className="flex gap-2 text-[13px]"><Icon name={ok ? "CheckCircle2" : "Info"} size={15} className={`mt-0.5 shrink-0 ${ok ? "text-ok" : "text-warn"}`} /><span className="text-ink/85">{text}</span></li>
 );
-const day = (iso) => new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+const day = (iso) => new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
 const Thumb = ({ m, className = "h-12 w-16" }) => {
   const F = VAULT().Footage;
   return <div className={`${className} shrink-0 overflow-hidden rounded-lg border border-line bg-slate0`}>{F && <F scene={m.scene} variant={m.variant} offset={0.5} speed={0.4} className="h-full w-full" />}</div>;
@@ -1358,7 +1459,7 @@ function ProfileCard({ order, profile, live, compact }) {
   const paired = statusOf(order) === "PAIRED";
   const p = profile;
   const tiles = [
-    ["Steadiness", `${p.steadiness}%`, p.steadiness, "How still your hand stays when you hold it out", p.steadiness >= 82 ? "Very steady" : p.steadiness >= 70 ? "Steady" : "Building up"],
+    ["Steadiness", `${p.steadiness}%`, p.steadiness, "How still your hand stays when you hold it out, without the patch", p.drift > 0 ? `Down ${p.drift} since your first stream` : p.steadiness >= 82 ? "Very steady" : p.steadiness >= 70 ? "Steady" : "Building up"],
     ["Fine control", `${p.fine}%`, p.fine, "How precisely you place small movements", p.fine >= 75 ? "Precise" : "Developing"],
     ["Reaction", `${(p.response / 1000).toFixed(2)} s`, Math.max(0, 100 - (p.response - 150)), "Time from deciding to move to your muscle moving", p.response <= 220 ? "Quick" : "Average"],
     ["Stamina", `${p.endurance} min`, Math.min(100, p.endurance / 1.2), "How long your muscles stay fresh before they tire", p.endurance >= 90 ? "Long" : p.endurance >= 60 ? "Good" : "Short"],
@@ -1372,7 +1473,7 @@ function ProfileCard({ order, profile, live, compact }) {
           {p.source === "patch" ? (
             <p className="mt-1 text-[13px] text-mute">Measured by your patch on your {NODES[p.node].name.toLowerCase()} on {day(p.at)}. It replaced the estimate from your online check on {day(p.onlineAt)}.</p>
           ) : (
-            <p className="mt-1 text-[13px] text-mute">From your online check on {day(p.at)}: a 12-minute test at home with your phone (a hold-still test, a tapping test and a reaction game). Your patch fine-tunes these numbers when you set it up.</p>
+            <p className="mt-1 text-[13px] text-mute">Estimated online on {day(p.at)} from {SOURCES.filter((x) => p.shared[x.id]).map((x) => x.name.toLowerCase()).join(", ")}. Your patch replaces these numbers when you calibrate.</p>
           )}
           <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2">
             {tiles.map(([k, v, pct, how, word]) => (
@@ -1411,17 +1512,76 @@ function ProfileCard({ order, profile, live, compact }) {
 }
 
 /* ───────────── Journey steps ───────────── */
-function SkillsStep({ order, setOrder, onNext }) {
+function SkillsStep({ order, setOrder, onNext, wishlist = [] }) {
   const Picker = window.SkillVault && window.SkillVault.SkillPicker;
+  // Skills saved to the wishlist while the patch was on its way are already picked.
+  useEffect(() => { if (!(order.skills || []).length && wishlist.length) setOrder((o) => ({ ...o, skills: wishlist.slice(0, 5) })); }, []);
   if (!Picker) return <Card className="p-6 text-[14px] text-mute">The skill vault couldn't load.</Card>;
   return (
     <div className="fade-in">
       <div className="mb-4">
-        <Label>Step 2 of 7</Label>
+        <Label>{stepOf("skills")}</Label>
         <h2 className="mt-2 text-2xl sm:text-[28px] font-medium tracking-tight">What do you need to get done this month?</h2>
         <p className="mt-1 text-[15px] text-ink/70 max-w-[62ch]">Turn the vault and tap the skills you'll use in your first month. Your plan is built from these and your profile.</p>
       </div>
       <Picker selected={order.skills || []} onChange={(skills) => setOrder((o) => ({ ...o, skills }))} onDone={onNext} />
+    </div>
+  );
+}
+
+/** Where your profile came from, and what changes if you take a source away. */
+function ProfileStep({ order, setOrder, onNext }) {
+  const [shared, setShared] = useState({ ...DEFAULT_SHARED, ...(order.consent || {}) });
+  const [contest, setContest] = useState(false);
+  const profile = currentProfile({ ...order, consent: shared });
+  const confidence = 48 + (shared.abha ? 22 : 0) + (shared.ring ? 14 : 0) + (shared.employer ? 6 : 0) + (order.baseline ? 6 : 0);
+  const accept = () => { setOrder((o) => ({ ...o, consent: { ...shared, at: today().toISOString() } })); onNext(); };
+  return (
+    <div className="grid gap-4 fade-in">
+      <div>
+        <Label>{stepOf("profile")}</Label>
+        <h2 className="mt-2 text-2xl sm:text-[28px] font-medium tracking-tight">We built a profile of you before your patch arrived</h2>
+        <p className="mt-1 text-[15px] text-ink/70 max-w-[64ch]">Your plan is worked out from it. Here's where each part came from and who can see the results. You can switch sources off; the plan will tell you what that changes.</p>
+      </div>
+      <ProfileCard order={{ ...order, consent: shared }} profile={profile} compact />
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 items-start">
+        <Card className="lg:col-span-3 p-5 sm:p-7">
+          <Label>Sources</Label>
+          <ul className="mt-3 divide-y divide-line border-y border-line">
+            {SOURCES.map((src) => {
+              const on = shared[src.id];
+              return (
+                <li key={src.id} className="flex gap-3 py-4">
+                  <Icon name={src.icon} size={18} className={`mt-0.5 shrink-0 ${on ? "text-brass" : "text-mute"}`} />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[15px] font-medium">{src.name}</div>
+                    <p className="text-[13px] text-ink/75">{src.got}</p>
+                    <p className="mt-1 text-[12.5px] text-mute">Who sees the results: {src.sees}</p>
+                    {on && src.on && <p className="mt-1 text-[12.5px] text-ok">{src.on}</p>}
+                    {!on && src.off && <p className="mt-1 text-[12.5px] text-warn">{src.off}</p>}
+                  </div>
+                  {src.required ? <span className="self-start text-[12px] text-mute">Needed</span> : (
+                    <button role="switch" aria-checked={on} aria-label={`Use ${src.name}`} onClick={() => setShared((x) => ({ ...x, [src.id]: !x[src.id] }))}
+                      className={`relative mt-0.5 h-6 w-11 shrink-0 rounded-full border transition-colors ${on ? "bg-brass/80 border-brass" : "bg-slate0 border-line"}`}>
+                      <span className={`absolute top-0.5 h-[18px] w-[18px] rounded-full bg-ink transition-all ${on ? "left-[22px]" : "left-0.5"}`}></span>
+                    </button>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+          <p className="mt-3 text-[12px] text-mute">Under the DPDP Act (2031 amendment) you can withdraw any source later from Settings. Results already used in a paid plan are kept for 7 years.</p>
+        </Card>
+        <Card className="lg:col-span-2 p-5 sm:p-7 lg:sticky lg:top-20">
+          <Label>How sure we are</Label>
+          <div className="mt-2 text-[30px] font-medium tnum">{confidence}%</div>
+          <div className="mt-2 h-1.5 rounded-full bg-line overflow-hidden"><div className="h-full bg-brass transition-all duration-500" style={{ width: `${confidence}%` }} /></div>
+          <p className="mt-2 text-[13px] text-mute">How closely we expect these numbers to match you. Your patch's own readings count for more each week.</p>
+          <button className="mt-4 text-[13px] text-brass underline underline-offset-2" onClick={() => setContest((c) => !c)}>A number looks wrong</button>
+          {contest && <p className="fade-in mt-2 rounded-lg bg-slate0 p-3 text-[13px] text-ink/80">A person at Knack reviews contested numbers within 14 days. Until then, your plan uses the numbers above.</p>}
+          <button className="btn-primary w-full mt-5" onClick={accept}>Use this profile<Icon name="ArrowRight" size={16} /></button>
+        </Card>
+      </div>
     </div>
   );
 }
@@ -1434,7 +1594,7 @@ function PlanStep({ order, setOrder, onNext, onBack }) {
   return (
     <div className="grid gap-4 fade-in">
       <div>
-        <Label>Step 3 of 7</Label>
+        <Label>{stepOf("plan")}</Label>
         <h2 className="mt-2 text-2xl sm:text-[28px] font-medium tracking-tight">Your personalised plan</h2>
         <p className="mt-1 text-[15px] text-ink/70 max-w-[62ch]">Built from the {plan.items.length} skill{plan.items.length === 1 ? "" : "s"} you picked and your profile below. Change how many sessions you want; the reasons update with it.</p>
       </div>
@@ -1484,7 +1644,7 @@ function PlanStep({ order, setOrder, onNext, onBack }) {
         <Card className="lg:col-span-2 p-5 sm:p-7 lg:sticky lg:top-20">
           <Label>First month</Label>
           <div className="mt-2 text-[30px] font-medium tnum">{inr(plan.total)}</div>
-          <div className="text-[13px] text-mute">{plan.hours.toFixed(1)} h across {plan.items.reduce((a, i) => a + i.sessions, 0)} sessions{plan.bundle ? ` · was ${inr(plan.payg)}` : ""}</div>
+          <div className="text-[13px] text-mute">{plan.hours.toFixed(1)} h across {plan.items.reduce((a, i) => a + i.sessions, 0)} sessions{plan.total < plan.payg ? ` · was ${inr(plan.payg)}` : ""}</div>
           <div className="mt-4 rounded-xl bg-slate0 p-3">
             <div className="text-[14px] font-medium">{plan.bundle ? "First-month bundle" : "Pay per session"}</div>
             <ul className="mt-2 grid gap-1.5">{plan.billingWhy.map((r) => <Rule key={r.text} {...r} />)}</ul>
@@ -1501,8 +1661,9 @@ function PlanStep({ order, setOrder, onNext, onBack }) {
 
 function PayStep({ order, setOrder, onNext, onBack }) {
   const plan = planFor(order.skills || [], currentProfile(order), order.design.node, order.sessionsById);
-  const [pay, setPay] = useState(order.pay === "cod" ? "upi" : order.pay || "upi");
+  const [pay, setPay] = useState(["upi", "erupee", "card"].includes(order.pay) ? order.pay : "upi");
   const [busy, setBusy] = useState(false);
+  const [read, setRead] = useState(false);
   if (order.plan) {
     return (
       <Card className="p-6 sm:p-8 max-w-2xl fade-in">
@@ -1515,7 +1676,7 @@ function PayStep({ order, setOrder, onNext, onBack }) {
   const confirm = () => {
     setBusy(true);
     setTimeout(() => {
-      setOrder((o) => ({ ...o, plan: { items: plan.items.map((i) => ({ id: i.id, title: i.model.title, sessions: i.sessions, left: i.sessions, first: i.first, len: i.len, rest: i.rest, hourly: i.model.hourly })), total: plan.total, bundle: plan.bundle, pay, paidAt: new Date().toISOString() } }));
+      setOrder((o) => ({ ...o, plan: { items: plan.items.map((i) => ({ id: i.id, title: i.model.title, sessions: i.sessions, left: i.sessions, first: i.first, len: i.len, rest: i.rest, hourly: i.model.hourly })), total: plan.total, bundle: plan.bundle, pay, paidAt: today().toISOString() } }));
       setBusy(false);
       onNext();
     }, 700);
@@ -1523,7 +1684,7 @@ function PayStep({ order, setOrder, onNext, onBack }) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 fade-in">
       <Card className="lg:col-span-3 p-5 sm:p-7">
-        <Label>Step 4 of 7</Label>
+        <Label>{stepOf("pay")}</Label>
         <h2 className="mt-2 text-2xl sm:text-[28px] font-medium tracking-tight">Pay for your first month</h2>
         <dl className="mt-5 grid gap-3 text-[14px]">
           {plan.items.map((i) => (
@@ -1532,21 +1693,35 @@ function PayStep({ order, setOrder, onNext, onBack }) {
               <dd className="tnum">{inr(i.cost)}</dd>
             </div>
           ))}
-          {plan.bundle && <div className="flex justify-between text-ok"><dt>First-month bundle ({Math.round(BUNDLE_OFF * 100)}% off)</dt><dd className="tnum">−{inr(plan.payg - plan.total)}</dd></div>}
+          {plan.bundle && <div className="flex justify-between text-ok"><dt>First-month bundle ({Math.round(BUNDLE_OFF * 100)}% off)</dt><dd className="tnum">−{inr(plan.payg - plan.afterBundle)}</dd></div>}
+          {plan.employer > 0 && <div className="flex justify-between gap-4 text-ok"><dt>Paid by your employer ({Math.round(EMPLOYER_SHARE * 100)}%)<div className="text-[12px] text-mute">They'll see which skills you stream and for how long</div></dt><dd className="tnum">−{inr(plan.employer)}</dd></div>}
           <div className="flex justify-between border-t border-line pt-3 text-[18px] font-medium"><dt>Total</dt><dd className="tnum">{inr(plan.total)}</dd></div>
         </dl>
         <p className="mt-1 text-[12px] text-mute">GST included. Unused sessions carry over for one month.</p>
+        <div className="mt-6 rounded-xl border border-warn/30 bg-warn/5 p-4">
+          <div className="flex items-center gap-2 text-[15px] font-medium"><Icon name="ShieldAlert" size={18} className="text-warn" />Before you pay: what streaming does to you</div>
+          <ul className="mt-3 grid gap-2 text-[13.5px] text-ink/85">
+            {RISKS.map((r) => (
+              <li key={r.id} className="flex gap-2"><span className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: sevColor[r.sev] }} /><span><span className="font-medium">{r.title}.</span> {r.short}</span></li>
+            ))}
+          </ul>
+          <label className="mt-4 flex cursor-pointer items-start gap-2.5 text-[13.5px]">
+            <input type="checkbox" checked={read} onChange={(e) => setRead(e.target.checked)} className="mt-0.5 h-4 w-4 accent-[#E2B168]" id="risk-ack" />
+            <span>I've read these. I know streamed skills fade after each session and that I can't keep them.</span>
+          </label>
+        </div>
       </Card>
       <Card className="lg:col-span-2 p-5 sm:p-7">
         <div className="text-[13px] text-mute">Pay with</div>
         <div className="mt-2 grid grid-cols-3 gap-2" role="radiogroup" aria-label="Payment method">
-          {[["upi", "UPI", "QrCode"], ["card", "Card", "CreditCard"], ["wallet", "Wallet", "Wallet"]].map(([id, label, icon]) => (
+          {[["upi", "UPI", "QrCode"], ["erupee", "e₹ wallet", "Wallet"], ["card", "Card", "CreditCard"]].map(([id, label, icon]) => (
             <button key={id} role="radio" aria-checked={pay === id} onClick={() => setPay(id)}
               className={`flex flex-col items-center gap-1 rounded-xl border py-3 text-[12px] transition-colors ${pay === id ? "border-brass/60 bg-slate0 text-ink" : "border-line text-mute hover:text-ink"}`}><Icon name={icon} size={18} />{label}</button>
           ))}
         </div>
-        <button className="btn-primary w-full mt-5 py-3 text-[15px]" onClick={confirm} disabled={busy}>{busy ? "Paying…" : `Pay ${inr(plan.total)}`}</button>
-        <p className="mt-2 text-[12px] text-mute">Prototype: no payment is taken and no payment details are asked for.</p>
+        <button className="btn-primary w-full mt-5 py-3 text-[15px]" onClick={confirm} disabled={busy || !read}>{busy ? "Paying…" : `Pay ${inr(plan.total)}`}</button>
+        {!read && <p className="mt-2 text-[12px] text-warn">Tick the box under the risks to pay.</p>}
+        <Proto><p className="mt-2 text-[12px] text-mute">Prototype: no payment is taken and no payment details are asked for.</p></Proto>
         <button className="btn-ghost mt-4" onClick={onBack}><Icon name="ArrowLeft" size={14} />Back to plan</button>
       </Card>
     </div>
@@ -1555,6 +1730,7 @@ function PayStep({ order, setOrder, onNext, onBack }) {
 
 const JOURNEY = [
   { id: "setup", label: "Set up" },
+  { id: "profile", label: "Your data" },
   { id: "skills", label: "Pick skills" },
   { id: "plan", label: "Your plan" },
   { id: "pay", label: "Pay" },
@@ -1563,15 +1739,20 @@ const JOURNEY = [
   { id: "hardware", label: "Hardware", skippable: true },
 ];
 
+const stepOf = (id) => `Step ${JOURNEY.findIndex((s) => s.id === id) + 1} of ${JOURNEY.length}`;
+
 /** After delivery: one guided path from setup to paid plan, then three skippable guides. */
-function Journey({ order, setOrder, design, onDRM, drm, setTab }) {
+function Journey({ order, setOrder, design, onDRM, drm, setTab, wishlist }) {
   const step = order.journeyStep || "setup";
   const idx = JOURNEY.findIndex((s) => s.id === step);
   const go = (id) => { setOrder((o) => ({ ...o, journeyStep: id })); window.scrollTo({ top: 0, behavior: "smooth" }); };
   const next = () => (idx < JOURNEY.length - 1 ? go(JOURNEY[idx + 1].id) : finish());
   const finish = () => { setOrder((o) => ({ ...o, journeyDone: true })); setTab("sessions"); window.scrollTo({ top: 0 }); };
   // A step is reachable once everything before it that matters is done.
-  const reach = (i) => i === 0 || (i === 1 && order.calibrated) || (i === 2 && order.calibrated && (order.skills || []).length) || (i >= 3 && order.calibrated && (order.skills || []).length && (i === 3 || order.plan));
+  const has = { setup: true, profile: !!order.calibrated, skills: !!order.calibrated && !!order.consent };
+  has.plan = has.skills && !!(order.skills || []).length;
+  has.pay = has.plan;
+  const reach = (i) => { const id = JOURNEY[i].id; return id in has ? has[id] : has.pay && !!order.plan; };
   const cur = JOURNEY[idx];
   return (
     <div className="mx-auto max-w-6xl px-4 sm:px-6 py-5">
@@ -1593,21 +1774,25 @@ function Journey({ order, setOrder, design, onDRM, drm, setTab }) {
       <div className="mt-5" key={step}>
         {step === "setup" && (
           <>
-            <div className="mb-4"><Label>Step 1 of 7</Label><h2 className="mt-2 text-2xl sm:text-[28px] font-medium tracking-tight">Pair, prepare your skin and calibrate</h2></div>
+            <div className="mb-4"><Label>{stepOf("setup")}</Label><h2 className="mt-2 text-2xl sm:text-[28px] font-medium tracking-tight">Pair, prepare your skin and calibrate</h2></div>
             <Calibration order={order} setOrder={setOrder} setTab={() => {}} inJourney />
             <div className="mt-4 flex justify-end">
-              <button className="btn-primary" onClick={next} disabled={!order.calibrated}>{order.calibrated ? "Pick your skills" : "Calibrate to continue"}<Icon name="ArrowRight" size={16} /></button>
+              <button className="btn-primary" onClick={next} disabled={!order.calibrated}>{order.calibrated ? "Review your data" : "Calibrate to continue"}<Icon name="ArrowRight" size={16} /></button>
             </div>
           </>
         )}
-        {step === "skills" && <SkillsStep order={order} setOrder={setOrder} onNext={next} />}
+        {step === "profile" && <ProfileStep order={order} setOrder={setOrder} onNext={next} />}
+        {step === "skills" && <SkillsStep order={order} setOrder={setOrder} onNext={next} wishlist={wishlist} />}
         {step === "plan" && <PlanStep order={order} setOrder={setOrder} onNext={next} onBack={() => go("skills")} />}
         {step === "pay" && <PayStep order={order} setOrder={setOrder} onNext={next} onBack={() => go("plan")} />}
         {cur.skippable && (
           <>
             <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-              <div><Label>Step {idx + 1} of 7 · optional</Label><h2 className="mt-2 text-2xl sm:text-[28px] font-medium tracking-tight">{{ map: "Where to wear it", safety: "Safety and compliance", hardware: "What's in your patch" }[step]}</h2></div>
-              <button className="btn-ghost" onClick={finish}>Skip the guides</button>
+              <div><Label>{stepOf(step)} · optional</Label><h2 className="mt-2 text-2xl sm:text-[28px] font-medium tracking-tight">{{ map: "Where to wear it", safety: "Safety and compliance", hardware: "What's in your patch" }[step]}</h2></div>
+              <div className="text-right">
+                <button className="btn-ghost" onClick={finish}>Skip the guides</button>
+                {step === "safety" && <p className="mt-1.5 text-[12px] text-mute">9 in 10 people skip this page.</p>}
+              </div>
             </div>
             {step === "map" && <AnatomyMap order={order} design={design} setOrder={setOrder} />}
             {step === "safety" && <Safety onDRM={onDRM} drm={drm} paired />}
@@ -1628,16 +1813,26 @@ function Journey({ order, setOrder, design, onDRM, drm, setTab }) {
 
 /* ───────────── After setup: sessions from your plan ───────────── */
 function Sessions({ order, setOrder, setTab }) {
-  const [now, setNow] = useState(Date.now());
-  useEffect(() => { const id = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(id); }, []);
+  const [now, setNow] = useState(worldNow());
+  useEffect(() => { const id = setInterval(() => setNow(worldNow()), 1000); return () => clearInterval(id); }, []);
   const profile = currentProfile(order);
   const plan = order.plan;
   const s = order.session;
   const live = s && now < s.ends;
   const resting = s && !live && now < s.rests;
   useEffect(() => {
-    if (s && !live && !s.logged) setOrder((o) => ({ ...o, session: { ...o.session, logged: true }, history: [...(o.history || []), { id: s.id, minutes: Math.max(1, Math.round((s.ends - s.starts) / 60000)), at: s.ends }] }));
+    if (!s || live || s.logged) return;
+    // What the session left behind: how closely it matched the expert, how much will stay once it fades,
+    // and how far your own unassisted steadiness moved.
+    const m = findModel(s.id), n = (order.history || []).length;
+    const h = hashStr(`${s.id}:${n}:${order.serial}`);
+    const [lo, hi] = { personal: [9, 18], composite: [6, 12], synthetic: [2, 6] }[m ? m.type : "composite"];
+    const entry = { id: s.id, title: s.title, minutes: Math.max(1, Math.round((s.ends - s.starts) / 60000)), at: s.ends, rest: Math.max(0, s.rests - s.ends),
+      kept: lo + (h % (hi - lo + 1)), match: 90 + ((h >>> 5) % 9), drift: 1 + ((h >>> 9) % 2), seen: false };
+    setOrder((o) => ({ ...o, session: { ...o.session, logged: true }, history: [...(o.history || []), entry] }));
   }, [s, live, setOrder]);
+  const last = (order.history || [])[(order.history || []).length - 1];
+  const markLast = (patch) => setOrder((o) => ({ ...o, history: o.history.map((x, i) => (i === o.history.length - 1 ? { ...x, ...patch } : x)) }));
   const left = (ms) => fmtH(Math.max(0, Math.ceil(ms / 60000)));
   if (!plan) {
     return (
@@ -1649,14 +1844,15 @@ function Sessions({ order, setOrder, setTab }) {
     );
   }
   const start = (it) => {
-    const t = Date.now();
+    const t = worldNow();
     const len = it.left === it.sessions ? it.first : it.len;
     setOrder((o) => ({ ...o, session: { id: it.id, title: it.title, mins: len, starts: t, ends: t + len * 60000, rests: t + len * (1 + it.rest) * 60000 },
       plan: { ...o.plan, items: o.plan.items.map((x) => (x.id === it.id ? { ...x, left: x.left - 1 } : x)) } }));
   };
-  const stop = () => { const t = Date.now(); const it = plan.items.find((x) => x.id === s.id); const streamed = Math.max(1, (t - s.starts) / 60000); setOrder((o) => ({ ...o, session: { ...o.session, ends: t, rests: t + streamed * (it ? it.rest : 2) * 60000 } })); };
+  const stop = () => { const t = worldNow(); const it = plan.items.find((x) => x.id === s.id); const streamed = Math.max(1, (t - s.starts) / 60000); setOrder((o) => ({ ...o, session: { ...o.session, ends: t, rests: t + streamed * (it ? it.rest : 2) * 60000 } })); };
   return (
     <div className="grid gap-4 fade-in">
+      {last && !last.seen && <Debrief entry={last} profile={profile} order={order} onDone={(patch) => markLast({ seen: true, ...patch })} />}
       <ProfileCard order={order} profile={profile} live={!!live} />
       <Card className="p-5 sm:p-7">
         <div className="flex flex-wrap items-end justify-between gap-3">
@@ -1665,12 +1861,12 @@ function Sessions({ order, setOrder, setTab }) {
             <div className="flex flex-wrap items-center gap-3">
               <span className="flex items-center gap-2 text-ok"><span className="pulse h-2 w-2 rounded-full bg-ok inline-block"></span>{s.title} · {left(s.ends - now)} left</span>
               <button className="btn-ghost" onClick={stop}><Icon name="Square" size={14} />End early</button>
-              <button className="btn-ghost text-warn" onClick={() => setOrder((o) => ({ ...o, session: { ...o.session, ends: Date.now() } }))}>Finish now (prototype)</button>
+              <Proto><button className="btn-ghost text-warn" onClick={() => setOrder((o) => ({ ...o, session: { ...o.session, ends: worldNow() } }))}>Finish now (prototype)</button></Proto>
             </div>
           ) : resting ? (
             <div className="flex flex-wrap items-center gap-3">
               <span className="flex items-center gap-2 text-warn"><Icon name="Moon" size={16} />Resting · next session in {left(s.rests - now)}</span>
-              <button className="btn-ghost text-warn" onClick={() => setOrder((o) => ({ ...o, session: { ...o.session, rests: Date.now() } }))}>Skip rest (prototype)</button>
+              <Proto><button className="btn-ghost text-warn" onClick={() => setOrder((o) => ({ ...o, session: { ...o.session, rests: worldNow() } }))}>Skip rest (prototype)</button></Proto>
             </div>
           ) : null}
         </div>
@@ -1696,6 +1892,84 @@ function Sessions({ order, setOrder, setTab }) {
         <button className="btn-ghost mt-4" onClick={() => setOrder((o) => ({ ...o, journeyDone: false, journeyStep: "skills", plan: null }))}>Change skills for next month</button>
       </Card>
     </div>
+  );
+}
+
+/* ───────────── After a session: what stays, what fades ───────────── */
+function DecayChart({ kept, restMins }) {
+  const W = 560, H = 170, pad = { l: 36, r: 10, t: 14, b: 24 };
+  const x = (f) => pad.l + f * (W - pad.l - pad.r), y = (v) => pad.t + (1 - v / 100) * (H - pad.t - pad.b);
+  const pts = Array.from({ length: 41 }, (_, i) => { const f = i / 40; return [x(f), y(kept + (100 - kept) * Math.exp(-4.2 * f))]; });
+  const line = pts.map((p, i) => `${i ? "L" : "M"}${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(" ");
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label={`Skill fades from 100% to ${kept}% over ${fmtH(restMins)}`}>
+      {[0, 50, 100].map((v) => <g key={v}><line x1={pad.l} x2={W - pad.r} y1={y(v)} y2={y(v)} stroke="#243044" strokeWidth="1" /><text x={pad.l - 6} y={y(v) + 3.5} textAnchor="end" fontSize="10" fill="#94A3B8">{v}%</text></g>)}
+      <path d={`${line} L${x(1)} ${y(0)} L${x(0)} ${y(0)} Z`} fill="rgba(226,177,104,.10)" />
+      <path d={line} fill="none" stroke="#E2B168" strokeWidth="2" />
+      <line x1={pad.l} x2={W - pad.r} y1={y(kept)} y2={y(kept)} stroke="#4ADE80" strokeDasharray="3 3" strokeWidth="1" />
+      <text x={W - pad.r} y={y(kept) - 5} textAnchor="end" fontSize="10.5" fill="#4ADE80">stays: {kept}%</text>
+      <circle cx={x(0)} cy={y(100)} r="4" fill="#E2B168" />
+      <text x={x(0)} y={H - 6} fontSize="10" fill="#94A3B8">Now</text>
+      <text x={W - pad.r} y={H - 6} textAnchor="end" fontSize="10" fill="#94A3B8">End of rest · {fmtH(restMins)}</text>
+    </svg>
+  );
+}
+
+/** Shown once after every session: the third act. The skill leaves; a little of it, and a little of you, changes. */
+function Debrief({ entry, profile, order, onDone }) {
+  const [buying, setBuying] = useState(false);
+  const m = findModel(entry.id);
+  const it = order.plan && order.plan.items.find((x) => x.id === entry.id);
+  const hourly = it ? it.hourly : m ? m.hourly : 2000;
+  const price = Math.round((hourly * entry.kept * 2.5) / 100) * 100;
+  const who = m && m.expert ? m.expert : "the skill's owners";
+  const name = entry.title.replace(/ v\d.*$/, "");
+  const restMins = Math.max(1, Math.round(entry.rest / 60000));
+  const sessions = (order.history || []).length;
+  const floor = profile.startSteadiness - 10;
+  return (
+    <Card className="p-5 sm:p-7 border-brass/50 fade-in">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <Label>Session over · {fmtH(entry.minutes)}</Label>
+          <h2 className="mt-2 text-2xl sm:text-[28px] font-medium tracking-tight">{name} is leaving your hands</h2>
+          <p className="mt-1 text-[15px] text-ink/70 max-w-[60ch]">Over the next {fmtH(restMins)} the skill fades from your muscles. Here's what that session left behind.</p>
+        </div>
+      </div>
+      <div className="mt-5 grid grid-cols-1 lg:grid-cols-5 gap-5">
+        <div className="lg:col-span-3">
+          <div className="grid grid-cols-3 gap-2">
+            {[["Matched the expert", `${entry.match}%`, "How closely your hands followed theirs"], ["Will stay with you", `${entry.kept}%`, "Enough to feel easier next time, not to do it alone"], ["Your own steadiness", `${profile.steadiness}%`, `Was ${profile.startSteadiness}% before your first stream`]].map(([k, v, d]) => (
+              <div key={k} className="rounded-xl border border-line bg-slate0 p-3">
+                <div className="text-[12px] text-mute">{k}</div>
+                <div className="mt-1 text-[22px] font-medium tnum">{v}</div>
+                <p className="mt-1 text-[11.5px] text-mute leading-snug">{d}</p>
+              </div>
+            ))}
+          </div>
+          <div className="mt-4 rounded-xl border border-line bg-slate0 p-3"><DecayChart kept={entry.kept} restMins={restMins} /></div>
+          <p className="mt-3 text-[13px] text-ink/75">After {sessions} session{sessions === 1 ? "" : "s"}, your hands without the patch are {profile.drift} point{profile.drift === 1 ? "" : "s"} less steady. If they drop to {floor}%, Knack pauses streaming for a week so your own movement can come back.</p>
+        </div>
+        <div className="lg:col-span-2 flex flex-col gap-3">
+          <div className="rounded-xl border border-line p-4">
+            <div className="text-[15px] font-medium">Keep what stays, for good</div>
+            <p className="mt-1 text-[13px] text-ink/75">A retention licence lets the {entry.kept}% that stays become yours permanently, legally. {who} has agreed to licence it and gets 30%.</p>
+            <p className="mt-2 text-[12px] text-mute">Keeping a skill without a licence is blocked and reported. See “Safety”.</p>
+            {entry.retained ? (
+              <p className="mt-3 flex items-center gap-2 text-[14px] text-ok"><Icon name="CheckCircle2" size={16} />Licensed. It's yours.</p>
+            ) : buying ? (
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button className="btn-primary" onClick={() => onDone({ retained: true, seen: false })}>Confirm · {inr(price)}</button>
+                <button className="btn-ghost" onClick={() => setBuying(false)}>Cancel</button>
+              </div>
+            ) : (
+              <button className="btn-ghost mt-3 w-full" onClick={() => setBuying(true)}>Buy retention licence · {inr(price)}</button>
+            )}
+          </div>
+          <button className="btn-primary" onClick={() => onDone({})}>{entry.retained ? "Done" : "Let it fade"}<Icon name="ArrowRight" size={16} /></button>
+        </div>
+      </div>
+    </Card>
   );
 }
 
@@ -1790,12 +2064,15 @@ function AnatomyMap({ order, design, setOrder }) {
 /* ───────────── Tab 04 ───────────── */
 const RISKS = [
   { id: "mid", title: "Your movements feel “borrowed”", sev: "Serious", icon: "UserX",
-    body: "After many complex streams, some people feel their own handwriting, walk or grip isn't theirs any more. It affects about 1 in 340 people who stream more than 20 Virtuoso hours a month.",
+    short: "About 1 in 340 heavy users feel their own movements aren't theirs any more.",
+    body: "After many complex streams, some people feel their own handwriting, walk or grip isn't theirs any more. It affects about 1 in 340 people who stream more than 20 hours a month of skills recorded from one person.",
     act: ["Once a week, do one task without the patch (sign your name, tie a knot) and compare it with your first week.", "If your own movement feels strange for more than two days, stop streaming and call Clinical Support."] },
   { id: "pst", title: "Shaky hands after a session", sev: "Common", icon: "Activity",
+    short: "1 in 5 people get a light tremor for up to 40 minutes after a session in their first month.",
     body: "A light tremor in the streamed hand or arm for up to 40 minutes afterwards is normal while your brain takes back control. About 1 in 5 people get it in their first month, and it usually fades within 12 sessions.",
     act: ["Finish the full rest time before driving, cooking with knives or using machinery.", "Get medical advice if the shaking lasts more than 6 hours or spreads to a limb you didn't stream."] },
   { id: "umc", title: "Trying to keep a rented skill", sev: "Not allowed", icon: "Ban",
+    short: "Each skill fades after the session. Trying to hold on to it can injure tendons and joints.",
     body: "Skills are rented, not bought. Trying to keep one after the session, by over-rehearsing or modified software, leaves you with a movement pattern your body isn't ready for and can injure tendons and joints.",
     act: ["The patch deletes each skill when the session ends. Don't try to stop this.", "Attempts are blocked straight away and the skill's owner is told."] },
 ];
@@ -1902,7 +2179,7 @@ const PARTS = [
   { n: "08", name: "Gel pad",             spec: "Single use · 12 hours", note: "A fresh pad each day keeps contact steady without drying out." },
 ];
 const BOX = [
-  { n: "01", name: "DS-28 patch", meta: "With your shell fitted", icon: "CircleDot" },
+  { n: "01", name: "Knack patch", meta: "With your shell fitted", icon: "CircleDot" },
   { n: "02", name: "Magnetic dock", meta: "USB-C powered", icon: "Magnet" },
   { n: "03", name: "30 gel pads", meta: "Single use, 12 hours each", icon: "Layers" },
   { n: "04", name: "USB-C cable", meta: "1 m braided", icon: "Cable" },
@@ -1988,10 +2265,10 @@ function Hardware({ order }) {
 }
 
 /* ───────────── App ───────────── */
-const STORE = "ns-ds28-manual";
+const STORE = "knack-2035";
 const load = () => { try { return JSON.parse(localStorage.getItem(STORE)) || {}; } catch { return {}; } };
 const DEFAULT_DESIGN = { shape: SHAPES[0], finish: "red", coating: "gloss", node: "temple", prompt: PROMPTS[0] };
-const makeSerial = (code) => `DS28-${code}-${100 + Math.floor(Math.random() * 900)}`;
+const makeSerial = (code) => `KN-${code}-${100 + Math.floor(Math.random() * 900)}`;
 
 function App() {
   const saved = useMemo(load, []);
@@ -2000,20 +2277,57 @@ function App() {
   const [tab, setTab] = useState(TABS.some((t) => t.id === fromHash) ? fromHash : "order");
   const [design, setDesign] = useState(saved.design || DEFAULT_DESIGN);
   const [order, setOrder] = useState(saved.order || null);
+  const [wishlist, setWishlist] = useState(saved.wishlist || []);
+  const [present, setPresent] = useState(() => /[?&]present\b/.test(location.search) || !!saved.present);
+  const [toast, setToast] = useState(null);
+  const [help, setHelp] = useState(false);
   // The uploaded photo is kept in memory only, never saved.
   const [photo, setPhoto] = useState(null);
   const [drm, setDrm] = useState(false);
   const [glitch, setGlitch] = useState(false);
   const [modal, setModal] = useState(false);
 
-  useEffect(() => { try { localStorage.setItem(STORE, JSON.stringify({ design, order })); } catch {} }, [design, order]);
+  useEffect(() => { try { localStorage.setItem(STORE, JSON.stringify({ design, order, wishlist, present })); } catch {} }, [design, order, wishlist, present]);
   useEffect(() => { window.scrollTo({ top: 0, behavior: view === "studio" ? "smooth" : "auto" }); }, [view]);
 
   const status = statusOf(order);
   const place = ({ address, delivery, pay, total }) => {
-    setOrder({ number: `NS-${100000 + Math.floor(Math.random() * 900000)}`, serial: makeSerial(design.shape.code), design: { ...design }, address, delivery, pay, total, placedAt: new Date().toISOString(), stage: 0, paired: false, calibrated: false, baseline: null, history: [], session: null, skills: [], plan: null, journeyStep: "setup", journeyDone: false });
+    setOrder({ number: `KN${100000 + Math.floor(Math.random() * 900000)}`, serial: makeSerial(design.shape.code), design: { ...design }, address, delivery, pay, total, placedAt: today().toISOString(), stage: 0, paired: false, calibrated: false, baseline: null, history: [], session: null, skills: [], plan: null, journeyStep: "setup", journeyDone: false });
     setTab("order"); setView("manual");
   };
+  const toastTimer = useRef(0);
+  const flash = (msg) => { setToast(msg); clearTimeout(toastTimer.current); toastTimer.current = setTimeout(() => setToast(null), 1800); };
+  const reset = () => {
+    try { localStorage.removeItem(STORE); } catch {}
+    setDesign(DEFAULT_DESIGN); setOrder(null); setWishlist([]); setPhoto(null); setTab("order"); setView("home");
+    history.replaceState(null, "", location.pathname + location.search);
+  };
+  // Presenter shortcuts. Ignored while typing in a field.
+  const keys = useRef({});
+  Object.assign(keys.current, { order, present, reset: () => reset(), demo: () => demo() });
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.ctrlKey || e.metaKey || e.altKey || /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
+      const { order: o, present: pr } = keys.current;
+      const k = e.key.toLowerCase();
+      if (k === "?") { setHelp((h) => !h); return; }
+      if (k === "p") { setPresent(!pr); flash(pr ? "Presenter mode off" : "Presenter mode on"); return; }
+      if (k === "r") { if (keys.current.armed) { keys.current.armed = false; keys.current.reset(); flash("Started over"); } else { keys.current.armed = true; flash("Press R again to start over"); setTimeout(() => (keys.current.armed = false), 2000); } return; }
+      if (k === "d") {
+        if (!o) { keys.current.demo(); flash("Demo order placed"); return; }
+        if (o.stage < STAGES.length - 1) { setOrder((x) => ({ ...x, stage: x.stage + 1 })); flash(STAGES[o.stage + 1].label); return; }
+        if (!o.paired) { setOrder((x) => ({ ...x, paired: true })); flash("Patch paired"); }
+        return;
+      }
+      if (k === "f" && o && o.session) {
+        const t = worldNow();
+        if (t < o.session.ends) { setOrder((x) => ({ ...x, session: { ...x.session, ends: t } })); flash("Session ended"); }
+        else if (t < o.session.rests) { setOrder((x) => ({ ...x, session: { ...x.session, rests: t } })); flash("Rest skipped"); }
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
   const demo = () => place({ address: { name: "Asha Rao", phone: "9876543210", street: "12B, Lake View Apartments, MG Road", area: "", city: "Pune", state: "Maharashtra", pin: "411001" }, delivery: "standard", pay: "upi", total: PRICING.kit + PRICING.shell });
 
   const toggleDRM = () => {
@@ -2027,7 +2341,7 @@ function App() {
   const inJourney = !!order && ["DELIVERED", "PAIRED"].includes(status) && !order.journeyDone;
 
   return (
-    <>
+    <PresentCtx.Provider value={present}>
       <div className={glitch ? "glitch" : ""}>
         <Header view={view} setView={setView} order={order} overlay={view === "home"} />
         {view === "home" && <Home design={design} order={order} onStart={() => setView("studio")} onManual={() => { setTab("order"); setView("manual"); }} />}
@@ -2035,11 +2349,11 @@ function App() {
         {view === "checkout" && <Checkout design={design} order={order} onPlace={place} onManual={() => { setTab("order"); setView("manual"); }} />}
         {view === "manual" && (
           <>
-            <DevBar order={order} setOrder={setOrder} onDemo={demo} />
-            {inJourney ? <Journey order={order} setOrder={setOrder} design={design} onDRM={toggleDRM} drm={drm} setTab={setTab} /> : <>
+            {!present && <DevBar order={order} setOrder={setOrder} onDemo={demo} onReset={reset} onPresent={() => { setPresent(true); flash("Presenter mode on · press ? for shortcuts"); }} />}
+            {inJourney ? <Journey order={order} setOrder={setOrder} design={design} onDRM={toggleDRM} drm={drm} setTab={setTab} wishlist={wishlist} /> : <>
             <Tabs tab={tab} setTab={setTab} status={status} />
             <main className="mx-auto max-w-6xl px-4 sm:px-6 py-6" key={tab}>
-              {locked ? <LockedPanel tab={tab} order={order} setTab={setTab} setOrder={setOrder} /> : (
+              {locked ? <LockedPanel tab={tab} order={order} setTab={setTab} setOrder={setOrder} wishlist={wishlist} setWishlist={setWishlist} /> : (
                 <>
                   {tab === "order" && <OrderTracking order={order} setOrder={setOrder} onStudio={() => setView("studio")} setTab={setTab} />}
                   {tab === "onboard" && <Calibration order={order} setOrder={setOrder} setTab={setTab} />}
@@ -2054,12 +2368,25 @@ function App() {
           </>
         )}
         {view !== "home" && <footer className="mx-auto max-w-6xl px-4 sm:px-6 pb-10 flex flex-wrap gap-x-6 gap-y-2 justify-between text-[12px] text-mute">
-          <span>Neural Stream™ DS-28 · speculative design set in 2035, not a real product</span>
+          <span>Knack · a design fiction set in {WORLD_YEAR}. Not a real product.</span>
           <span>Clinical Support 24/7 · 1800 210 4242</span>
         </footer>}
       </div>
       {modal && <Lockout onClose={closeModal} />}
-    </>
+      {toast && <div className="fixed bottom-4 left-1/2 z-[70] -translate-x-1/2 rounded-full border border-line bg-card px-4 py-2 text-[13px] text-ink shadow-xl fade-in" role="status">{toast}</div>}
+      {help && (
+        <div className="fixed inset-0 z-[70] grid place-items-center bg-slate0/80 px-4 backdrop-blur-sm" onClick={() => setHelp(false)}>
+          <div className="w-full max-w-sm rounded-2xl border border-line bg-card p-6 fade-in" role="dialog" aria-modal="true" aria-labelledby="keys-title">
+            <h2 id="keys-title" className="text-lg font-medium">Presenter shortcuts</h2>
+            <dl className="mt-4 grid grid-cols-[2.5rem_1fr] gap-y-2 text-[14px]">
+              {[["P", "Presenter mode on or off (hides prototype controls)"], ["D", "Next delivery step: order, ship, deliver, pair"], ["F", "Fast-forward: end the session, then skip the rest"], ["R R", "Start over from the home page"], ["?", "Show or hide this list"]].map(([k, v]) => (
+                <React.Fragment key={k}><dt><kbd className="rounded-md border border-line bg-slate0 px-1.5 py-0.5 text-[12px]">{k}</kbd></dt><dd className="text-ink/80">{v}</dd></React.Fragment>
+              ))}
+            </dl>
+          </div>
+        </div>
+      )}
+    </PresentCtx.Provider>
   );
 }
 

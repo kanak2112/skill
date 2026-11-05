@@ -13,7 +13,7 @@ import { DOMAINS, MODELS, MODEL_TYPES, formatWait, inr } from '../src/data/catal
 
 const MAX_SKILLS = 5;
 
-function Detail({ model, added, full, onToggle, onClose }) {
+function Detail({ model, added, full, onToggle, onClose, listName }) {
   const type = MODEL_TYPES[model.type];
   useEffect(() => {
     const k = (e) => e.key === 'Escape' && onClose();
@@ -53,7 +53,7 @@ function Detail({ model, added, full, onToggle, onClose }) {
           <button onClick={() => onToggle(model)} disabled={!added && full}
             className={`btn mt-5 h-12 w-full ${added ? 'btn-secondary' : 'bg-accent text-[#0F172A] hover:bg-[#EBC283]'}`}>
             <Icon name={added ? 'remove' : 'add'} size={18} />
-            {added ? 'Remove from my first month' : full ? `You can pick up to ${MAX_SKILLS} skills` : 'Add to my first month'}
+            {added ? `Remove from ${listName}` : full ? `You can pick up to ${MAX_SKILLS} skills` : `Add to ${listName}`}
           </button>
         </div>
       </div>
@@ -61,7 +61,8 @@ function Detail({ model, added, full, onToggle, onClose }) {
   );
 }
 
-function SkillPicker({ selected = [], onChange, onDone }) {
+function SkillPicker({ selected = [], onChange, onDone, wishlist = false }) {
+  const listName = wishlist ? 'my wishlist' : 'my first month';
   const [open, setOpenState] = useState(null);
   // Closing the detail sheet hands keyboard focus back to the vault.
   const setOpen = (m) => {
@@ -76,13 +77,13 @@ function SkillPicker({ selected = [], onChange, onDone }) {
   return (
     <div id="vault" className="font-sans text-ink">
       <div className="grid gap-4 lg:grid-cols-[minmax(0,440px)_minmax(0,1fr)]">
-        <div className="h-[680px] overflow-hidden rounded-2xl border border-line bg-canvas">
+        <div className="h-[min(680px,max(520px,calc(100dvh-150px)))] overflow-hidden rounded-2xl border border-line bg-canvas">
           <MarketplaceFrame onOpen={setOpen} selectedIds={selected} hint="Drag to browse · tap a card to add it" />
         </div>
         <div className="flex min-w-0 flex-col rounded-2xl border border-line bg-surface p-5">
-          <p className="eyebrow">Your first month</p>
+          <p className="eyebrow">{wishlist ? 'Your wishlist' : 'Your first month'}</p>
           <h2 className="mt-1 text-screen type-screen text-ink">{chosen.length ? `${chosen.length} skill${chosen.length === 1 ? '' : 's'} picked` : 'Pick the skills you need'}</h2>
-          <p className="mt-1 text-body text-muted">Choose up to {MAX_SKILLS}. Your plan is built around them and your profile. You can swipe up and down for other areas: {DOMAINS.map((d) => d.label.toLowerCase()).join(', ')}.</p>
+          <p className="mt-1 text-body text-muted">{wishlist ? `Save up to ${MAX_SKILLS} while your patch is on its way. They'll be waiting in your plan when it arrives.` : `Choose up to ${MAX_SKILLS}. Your plan is built around them and your profile.`} You can swipe up and down for other areas: {DOMAINS.map((d) => d.label.toLowerCase()).join(', ')}.</p>
           <ul className="mt-4 flex-1 space-y-2">
             {chosen.map((m) => (
               <li key={m.id} className="flex items-center gap-3 rounded-lg border border-line bg-canvas p-2.5">
@@ -100,12 +101,13 @@ function SkillPicker({ selected = [], onChange, onDone }) {
             ))}
             {!chosen.length && <li className="rounded-lg border border-dashed border-line p-5 text-center text-caption text-muted">Tap a card in the vault to see it and add it here.</li>}
           </ul>
-          <button onClick={onDone} disabled={!chosen.length} className="btn btn-primary mt-4 h-12 w-full">
-            See my personalised plan <Icon name="arrow_forward" size={18} />
+          <p className="mt-4 flex gap-2 text-caption text-muted"><Icon name="info" size={14} className="mt-0.5" />Skills come from the Vault, a licensed library run by the Skill Guild of India. Every personal skill was recorded from a real person, who is paid for each minute you stream it.</p>
+          <button onClick={onDone} disabled={!chosen.length} className="btn btn-primary mt-3 h-12 w-full">
+            {wishlist ? 'Save my wishlist' : 'See my personalised plan'} <Icon name="arrow_forward" size={18} />
           </button>
         </div>
       </div>
-      {open && <Detail model={open} added={selected.includes(open.id)} full={selected.length >= MAX_SKILLS} onToggle={toggle} onClose={() => setOpen(null)} />}
+      {open && <Detail model={open} added={selected.includes(open.id)} full={selected.length >= MAX_SKILLS} onToggle={toggle} onClose={() => setOpen(null)} listName={listName} />}
     </div>
   );
 }

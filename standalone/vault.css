@@ -2,15 +2,15 @@
 
 /* Scoped copies of the shared component classes in src/index.css that the vault uses. */
 #vault { font-family: 'Google Sans Flex', ui-sans-serif, system-ui, sans-serif; }
-#vault .eyebrow { font-size: 13px; line-height: 1.3; font-weight: 500; color: #8E9BAE; }
+#vault .eyebrow { font-size: 13px; line-height: 1.3; font-weight: 500; color: #94A3B8; }
 #vault .type-screen { font-variation-settings: 'opsz' 24; }
 #vault .tag { display: inline-flex; height: 22px; align-items: center; gap: .25rem; border-radius: 9999px; padding: 0 .625rem; font-size: 11px; line-height: 1; font-weight: 500; }
-#vault .btn { display: inline-flex; height: 2.75rem; align-items: center; justify-content: center; gap: .5rem; border-radius: 8px; padding: 0 1rem; font-size: 14px; font-weight: 500; transition: background-color .15s, color .15s, border-color .15s; }
+#vault .btn { display: inline-flex; height: 2.75rem; align-items: center; justify-content: center; gap: .5rem; border-radius: 12px; padding: 0 1rem; font-size: 14px; font-weight: 500; transition: background-color .15s, color .15s, border-color .15s; }
 #vault .btn:disabled { cursor: not-allowed; opacity: .4; }
 #vault .btn-primary { background: #E2B168; color: #0F172A; }
 #vault .btn-primary:hover { background: #EBC283; }
-#vault .btn-secondary { border: 1px solid #222A38; background: transparent; color: #F1F5F9; }
-#vault .btn-secondary:hover { background: #131924; }
+#vault .btn-secondary { border: 1px solid #243044; background: transparent; color: #F1F5F9; }
+#vault .btn-secondary:hover { background: #161F2E; }
 #vault .preserve-3d { transform-style: preserve-3d; }
 #vault button { font-family: inherit; }
 

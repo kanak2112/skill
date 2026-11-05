@@ -101,29 +101,39 @@ for first-person video. To use real clips, add muted MP4s to `public/footage/` a
 | `src/components/VaultTile.jsx`, `ModelVisuals.jsx` | Tile + provenance visual language |
 | `src/hooks/useSessionTimer.js` | Session lifecycle, kept in `App` across frame switches |
 
-## Standalone Web Manual (`standalone/Neural_Stream_Manual.html`)
+## Knack: standalone design-fiction prototype (`standalone/Knack.html`)
 
-A single self-contained HTML file built on the original diagnostic manual (same Tailwind CDN, React
-UMD + in-browser Babel and Lucide setup). Open it directly in a browser.
+Knack is a skin patch, set in 2035, that lets you rent an expert's hand skills by the hour. It's
+a single self-contained HTML file built on the original diagnostic manual (same Tailwind CDN, React
+UMD + in-browser Babel and Lucide setup). Open it directly in a browser. Every date it shows comes
+from an in-world clock: today's date and time, moved to 2035.
 
-- **Home:** full-screen 3D head (Three.js r147, orbit controls, slow auto-turn) with “Get yours now”,
-  which fades into the Shape Studio.
-- **Shape Studio:** describe, pick or draw a shell; colour and finish update live on the model.
-  “Upload your photo” projects a portrait onto the model's face (front projection blended into the
-  skin, with left/right, up/down and size controls); the photo stays in memory and is never saved.
-  Choosing temple, neck or forearm moves the camera to frame that spot; forearm zooms out to a raised
-  stand-in forearm model with the shell on its inner side.
-- **Checkout:** Indian delivery address and shipping speed in ₹.
-- **Web Manual, before delivery:** only Order Tracking, Where to Wear It and Safety are open.
-- **After delivery, a guided journey:** 1 pair, prepare skin and calibrate → 2 pick first-month
-  skills in the cylindrical skill vault (the main prototype's `MarketplaceFrame`, bundled from
-  `standalone/vault-entry.jsx` and styled by a Tailwind build scoped to `#vault`) → 3 personalised
-  plan per skill (session length from stamina and recovery, type-specific limits, placement and
-  waiting-list notes, four-week schedule, bundle vs pay per session) → 4 pay → 5–7 Where to Wear
-  It, Safety, Hardware (each skippable). Afterwards the manual opens on Your Sessions, which runs
-  the paid plan. The profile starts from the buyer's online check and is replaced by the patch
-  reading after calibration. Prototype controls can mark delivery, pair, finish setup and replay
-  the journey.
+- **Home:** full-screen 3D head (Three.js r147, orbit controls, slow auto-turn; still for people who
+  ask for reduced motion) with “Get yours now”, which fades into the Shape Studio.
+- **Shape Studio:** describe, pick or draw a shell; colour and finish update live on the model. The
+  shell has a printed side wall and a contact shadow on the skin. Descriptions with no shape, colour
+  or finish in them still land on the closest printable shell. “Upload your photo” first shows how
+  the face scan is used (with an optional, unticked partner-sharing offer), then projects the
+  portrait onto the model's face; the photo is never saved. Forearm zooms out to a raised forearm.
+- **Checkout:** Indian delivery address, standard or next-day drone drop, UPI / e₹ / card, all in ₹.
+- **Web Manual, before delivery:** Order Tracking, Where to Wear It and Safety are open, and Your
+  Sessions lets you start a skill wishlist in the vault.
+- **After delivery, a guided journey:** 1 pair (tap a phone on the box, or type the patch ID),
+  prepare skin and calibrate → 2 your data: where the online profile came from (phone check, ABHA
+  health record, smart ring, employer wellness programme), who sees each, and what switching one off
+  changes → 3 pick first-month skills in the cylindrical skill vault (the main prototype's
+  `MarketplaceFrame`, bundled from `standalone/vault-entry.jsx` with the manual's colours and icons)
+  → 4 personalised plan → 5 pay, which needs the risks acknowledged first → 6–8 Where to Wear It,
+  Safety, Hardware (each skippable).
+- **Your Sessions** runs the paid plan. After every session a debrief shows how closely you matched
+  the expert, how the skill fades over the rest period and how much stays, how your own unassisted
+  steadiness has moved, and offers a paid retention licence for what stays.
+
+**Presenting:** press `P` (or open with `?present`) to hide the prototype controls. Shortcuts:
+`D` next delivery step (places a demo order first if there is none, ends by pairing), `F` end the
+running session and then skip the rest, `R` twice to start over, `?` to list them. Outside
+presenter mode the dashed prototype bar has the same controls plus “Start over”.
 
 The head scan (“Lee Perry-Smith”, Infinite-Realities, CC BY 3.0) and its textures are embedded as
-base64. `standalone/manual-app.jsx` is the readable source of the file's app script.
+base64. `standalone/manual-app.jsx` is the readable source of the file's app script. After editing
+it, `vault-entry.jsx` or the vault styles, run `node standalone/build.mjs` to rebuild `Knack.html`.
