@@ -574,7 +574,7 @@ function statusOf(order) {
 function Header({ view, setView, order, overlay }) {
   const status = statusOf(order);
   const node = order ? NODES[order.design.node] : null;
-  const VIEWS = [["studio", "Shape Studio"], ["checkout", "Checkout"], ["manual", "Web Manual"]];
+  const VIEWS = [["studio", "Shape Studio"], ["checkout", "Checkout"], ["manual", "Web Manual"], ["experts", "For experts"]];
   let pill = null;
   if (status === "PAIRED") pill = <span className="flex items-center gap-2 rounded-full border border-ok/30 bg-ok/10 px-3 py-1.5 text-ok"><span className="pulse h-2 w-2 rounded-full bg-ok inline-block"></span>Patch connected · {node.name}</span>;
   else if (status === "DELIVERED") pill = <span className="flex items-center gap-2 rounded-full border border-warn/30 bg-warn/10 px-3 py-1.5 text-warn"><Icon name="PackageOpen" size={14} />Delivered · ready to set up</span>;
@@ -2306,11 +2306,12 @@ const makeSerial = (code) => `KN-${code}-${100 + Math.floor(Math.random() * 900)
 function App() {
   const saved = useMemo(load, []);
   const fromHash = location.hash.replace("#", "");
-  const [view, setView] = useState(["home", "studio", "checkout", "manual"].includes(fromHash) ? fromHash : TABS.some((t) => t.id === fromHash) ? "manual" : "home");
+  const [view, setView] = useState(["home", "studio", "checkout", "manual", "experts"].includes(fromHash) ? fromHash : TABS.some((t) => t.id === fromHash) ? "manual" : "home");
   const [tab, setTab] = useState(TABS.some((t) => t.id === fromHash) ? fromHash : "order");
   const [design, setDesign] = useState(saved.design || DEFAULT_DESIGN);
   const [order, setOrder] = useState(saved.order || null);
   const [wishlist, setWishlist] = useState(saved.wishlist || []);
+  const [expert, setExpert] = useState(saved.expert || { step: "apply" });
   const [present, setPresent] = useState(() => /[?&]present\b/.test(location.search) || !!saved.present);
   const [toast, setToast] = useState(null);
   const [help, setHelp] = useState(false);
@@ -2320,7 +2321,7 @@ function App() {
   const [glitch, setGlitch] = useState(false);
   const [modal, setModal] = useState(false);
 
-  useEffect(() => { try { localStorage.setItem(STORE, JSON.stringify({ design, order, wishlist, present })); } catch {} }, [design, order, wishlist, present]);
+  useEffect(() => { try { localStorage.setItem(STORE, JSON.stringify({ design, order, wishlist, present, expert })); } catch {} }, [design, order, wishlist, present, expert]);
   useEffect(() => { window.scrollTo({ top: 0, behavior: view === "studio" ? "smooth" : "auto" }); }, [view]);
 
   const status = statusOf(order);
@@ -2332,7 +2333,7 @@ function App() {
   const flash = (msg) => { setToast(msg); clearTimeout(toastTimer.current); toastTimer.current = setTimeout(() => setToast(null), 1800); };
   const reset = () => {
     try { localStorage.removeItem(STORE); } catch {}
-    setDesign(DEFAULT_DESIGN); setOrder(null); setWishlist([]); setPhoto(null); setTab("order"); setView("home");
+    setDesign(DEFAULT_DESIGN); setOrder(null); setWishlist([]); setExpert({ step: "apply" }); setPhoto(null); setTab("order"); setView("home");
     history.replaceState(null, "", location.pathname + location.search);
   };
   // Presenter shortcuts. Ignored while typing in a field.
@@ -2379,6 +2380,7 @@ function App() {
         <Header view={view} setView={setView} order={order} overlay={view === "home"} />
         {view === "home" && <Home design={design} order={order} onStart={() => setView("studio")} onManual={() => { setTab("order"); setView("manual"); }} />}
         {view === "studio" && <Studio design={design} setDesign={setDesign} onBuy={() => setView("checkout")} photo={photo} setPhoto={setPhoto} />}
+        {view === "experts" && <Experts expert={expert} setExpert={setExpert} order={order} />}
         {view === "checkout" && <Checkout design={design} order={order} onPlace={place} onManual={() => { setTab("order"); setView("manual"); }} />}
         {view === "manual" && (
           <>

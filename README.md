@@ -125,6 +125,11 @@ from an in-world clock: today's date and time, moved to 2035.
   `MarketplaceFrame`, bundled from `standalone/vault-entry.jsx` with the manual's colours and icons)
   → 4 personalised plan → 5 pay, which needs the risks acknowledged first → 6–8 Where to Wear It,
   Safety, Hardware (each skippable).
+- **For experts:** Chef Arjun Mehra's side of the same skill. He applies and is checked, agrees the
+  split (30% to him) and clause 14.2 (his recordings can be combined into composite skills), records
+  six months of service with two patches, has his worst hours removed in review, publishes, and
+  watches his earnings: where his hands are streaming now, and the composite built partly from his
+  hours overtaking him. A stream of his skill from this browser's own order pings his dashboard.
 - **Your Sessions** runs the paid plan. After every session a full-screen debrief plays out: the
   expert's hands leaving yours, a counter and curve falling to the share of the skill that stays, how
   closely you matched the expert, how your own unassisted steadiness has moved, and a paid retention

@@ -29,7 +29,8 @@ const bundle = await build({
 });
 const vaultJs = bundle.outputFiles[0].text.trim();
 const css = execFileSync('npx', ['tailwindcss', '-c', 'vault.tailwind.config.js', '-i', 'vault.css', '--minify'], { cwd: here, stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
-const app = readFileSync(resolve(here, 'manual-app.jsx'), 'utf8');
+const APP_MARK = '/* ───────────── App ───────────── */';
+const app = readFileSync(resolve(here, 'manual-app.jsx'), 'utf8').replace(APP_MARK, () => readFileSync(resolve(here, 'experts.jsx'), 'utf8') + '\n' + APP_MARK);
 
 let html = readFileSync(out, 'utf8');
 const swap = (startMark, endMark, body, label) => {
