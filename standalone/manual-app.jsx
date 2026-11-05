@@ -1944,22 +1944,22 @@ function Debrief({ entry, profile, order, onDone }) {
   return ReactDOM.createPortal(
     <div className="fixed inset-0 z-50 overflow-y-auto bg-[#06080d] text-ink" role="dialog" aria-modal="true" aria-labelledby="debrief-title">
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(60%_50%_at_30%_35%,rgba(226,177,104,0.10),transparent_70%)]" />
-      <div className="relative mx-auto flex min-h-full max-w-5xl flex-col justify-center px-5 py-10 sm:px-10 sm:py-14">
+      <div className="relative mx-auto flex min-h-full max-w-5xl flex-col justify-center px-5 py-[max(28px,4vh)] sm:px-10">
         <div className="flex items-center justify-between gap-4">
           <Label>Session over · {name} · {fmtH(entry.minutes)}</Label>
           {!done && <button className="text-[13px] text-mute hover:text-ink" onClick={() => setT(end)}>Skip</button>}
         </div>
-        <h2 id="debrief-title" className={`mt-4 max-w-[18ch] text-[34px] font-medium leading-[1.05] tracking-tight sm:text-[58px] ${show(BEATS.title)}`}>
+        <h2 id="debrief-title" className={`mt-3 max-w-[18ch] text-[34px] font-medium leading-[1.05] tracking-tight sm:text-[clamp(38px,6.4vh,60px)] ${show(BEATS.title)}`}>
           {expert ? `${expert}'s hands are leaving yours.` : `${name} is leaving your hands.`}
         </h2>
 
-        <div className={`mt-8 grid items-end gap-6 sm:mt-10 lg:grid-cols-[320px_minmax(0,1fr)] ${show(BEATS.count - 300)}`}>
+        <div className={`mt-8 grid items-end gap-6 sm:mt-[4vh] lg:grid-cols-[320px_minmax(0,1fr)] ${show(BEATS.count - 300)}`}>
           <div>
-            <div className="text-[88px] font-light leading-none tracking-tight text-brass tnum sm:text-[148px]" aria-live="off">{Math.round(value)}<span className="text-[0.45em] align-top">%</span></div>
+            <div className="text-[88px] font-light leading-none tracking-tight text-brass tnum sm:text-[clamp(96px,15vh,148px)]" aria-live="off">{Math.round(value)}<span className="text-[0.45em] align-top">%</span></div>
             <p className="mt-2 max-w-[24ch] text-[15px] text-ink/75 sm:text-[17px]" aria-live="polite">{done ? `stays with you. The rest is gone by the end of your ${fmtH(restMins)} rest.` : "of the skill is still in your hands"}</p>
           </div>
           <div className="min-w-0">
-            <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="h-[150px] w-full sm:h-[220px]" aria-hidden="true">
+            <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="h-[150px] w-full sm:h-[clamp(130px,20vh,220px)]" aria-hidden="true">
               <defs><linearGradient id="fadeFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#E2B168" stopOpacity=".28" /><stop offset="1" stopColor="#E2B168" stopOpacity="0" /></linearGradient></defs>
               <line x1="0" x2={W} y1={H} y2={H} stroke="#243044" strokeWidth="2" vectorEffect="non-scaling-stroke" />
               <path d={`${line} L${head[0]} ${H} L0 ${H} Z`} fill="url(#fadeFill)" />
@@ -1970,7 +1970,7 @@ function Debrief({ entry, profile, order, onDone }) {
           </div>
         </div>
 
-        <div className={`mt-10 grid grid-cols-1 gap-3 sm:grid-cols-3 ${show(BEATS.facts)}`}>
+        <div className={`mt-8 grid grid-cols-1 gap-3 sm:mt-[4vh] sm:grid-cols-3 ${show(BEATS.facts)}`}>
           {[["Matched the expert", `${entry.match}%`, "How closely your hands followed theirs"], ["Stays with you", `${entry.kept}%`, "Enough to feel easier next time, not to do it alone"], ["Your own steadiness", `${profile.startSteadiness}% → ${profile.steadiness}%`, "Without the patch, since your first stream"]].map(([k, v, d]) => (
             <div key={k} className="border-t border-line pt-3">
               <div className="text-[13px] text-mute">{k}</div>
@@ -1979,9 +1979,9 @@ function Debrief({ entry, profile, order, onDone }) {
             </div>
           ))}
         </div>
-        <p className={`mt-6 max-w-[62ch] text-[15px] text-ink/80 ${show(BEATS.drift)}`}>Each session leaves your own hands a little less steady. At {floor}%, Knack pauses streaming for a week so your own movement can come back.</p>
+        <p className={`mt-5 max-w-[62ch] text-[15px] text-ink/80 ${show(BEATS.drift)}`}>Each session leaves your own hands a little less steady. At {floor}%, Knack pauses streaming for a week so your own movement can come back.</p>
 
-        <div className={`mt-10 flex flex-col gap-5 border-t border-line pt-6 lg:flex-row lg:items-end lg:justify-between ${show(BEATS.offer)}`}>
+        <div className={`mt-8 flex flex-col gap-5 border-t border-line pt-5 sm:mt-[3.5vh] lg:flex-row lg:items-end lg:justify-between ${show(BEATS.offer)}`}>
           <div className="max-w-[56ch]">
             <div className="text-[17px] font-medium">Keep the {entry.kept}% for good</div>
             <p className="mt-1 text-[14px] text-ink/75">A retention licence makes what stays legally yours.{expert ? ` ${expert} has agreed and gets 30%.` : ""} Keeping it any other way is blocked and reported.</p>
