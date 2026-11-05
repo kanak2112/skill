@@ -700,7 +700,7 @@ function PhotoPanel({ photo, setPhoto }) {
           <ul className="mt-3 grid gap-1.5 text-[13px] text-ink/80">
             <li className="flex gap-2"><Icon name="Check" size={14} className="mt-0.5 shrink-0 text-ok" />Used only to draw this preview, on this device.</li>
             <li className="flex gap-2"><Icon name="Check" size={14} className="mt-0.5 shrink-0 text-ok" />Deleted when you close the page. Never used to train a model.</li>
-            <li className="flex gap-2"><Icon name="Check" size={14} className="mt-0.5 shrink-0 text-ok" />Not linked to your Knack account or your motor profile.</li>
+            <li className="flex gap-2"><Icon name="Check" size={14} className="mt-0.5 shrink-0 text-ok" />Not linked to your Knack account or your movement profile.</li>
           </ul>
           <label className="mt-3 flex cursor-pointer items-start gap-2.5 rounded-lg border border-line bg-slate0 p-3 text-[13px] text-mute">
             <input type="checkbox" checked={share} onChange={(e) => setShare(e.target.checked)} className="mt-0.5 accent-[#E2B168]" />
@@ -1401,7 +1401,7 @@ function planFor(ids, p, node, sessionsById = {}) {
     why.push({ ok: true, text: `Your first session is ${fmtH(first)}${p.recovery === "Slow" ? (shared.ring ? " because you recover slowly" : " because, without your ring data, recovery is assumed to be slow") : ""}${shared.abha ? "" : " (15 min shorter without your health record)"}, then ${fmtH(len)}` });
     if (m.domain === "physical" && node === "temple") why.push({ ok: false, text: "Physical skills read best with the patch on your forearm or neck" });
     if (m.waitMins) why.push({ ok: false, text: `Has a waiting list (about ${fmtH(m.waitMins)}), so book ahead` });
-    const sessions = sessionsById[m.id] || (m.domain === "cognitive" ? 3 : 4);
+    const sessions = sessionsById[m.id] || 4;
     const minutes = first + (sessions - 1) * len;
     return { id: m.id, model: m, len, first, sessions, minutes, cost: (minutes / 60) * m.hourly, rest: REST[m.type] || 2, why };
   });
@@ -1469,7 +1469,7 @@ function ProfileCard({ order, profile, live, compact }) {
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
         <div className={compact ? "lg:col-span-5" : "lg:col-span-3"}>
           <Label>Your profile</Label>
-          <h2 className="mt-2 text-xl font-medium tracking-tight">{order.address.name.split(" ")[0]}'s motor profile</h2>
+          <h2 className="mt-2 text-xl font-medium tracking-tight">{order.address.name.split(" ")[0]}'s movement profile</h2>
           {p.source === "patch" ? (
             <p className="mt-1 text-[13px] text-mute">Measured by your patch on your {NODES[p.node].name.toLowerCase()} on {day(p.at)}. It replaced the estimate from your online check on {day(p.onlineAt)}.</p>
           ) : (

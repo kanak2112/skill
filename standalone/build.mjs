@@ -18,6 +18,8 @@ const shims = {
     b.onResolve({ filter: /^react$/ }, () => ({ path: 'react', namespace: 'shim' }));
     b.onLoad({ filter: /.*/, namespace: 'shim' }, () => ({ contents: 'module.exports = window.React;', loader: 'js' }));
     b.onResolve({ filter: /components\/Icon\.jsx$/ }, () => ({ path: resolve(here, 'vault-icon.jsx') }));
+    // Movement skills only: every import of the catalogue gets the filtered copy, except the copy itself.
+    b.onResolve({ filter: /data\/catalog\.js$/ }, (args) => (args.importer.endsWith('vault-catalog.js') ? undefined : { path: resolve(here, 'vault-catalog.js') }));
   },
 };
 const bundle = await build({
