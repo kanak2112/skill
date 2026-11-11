@@ -1,0 +1,341 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Two Pairs of Hands · narrated storyboard</title>
+<style>
+  @font-face { font-family: "Bangers"; src: url(fonts/bangers-latin-400-normal.woff2) format("woff2"); }
+  @font-face { font-family: "Comic Neue"; font-weight: 700; src: url(fonts/comic-neue-latin-700-normal.woff2) format("woff2"); }
+  @font-face { font-family: "Comic Neue"; font-weight: 400; src: url(fonts/comic-neue-latin-400-normal.woff2) format("woff2"); }
+  @font-face { font-family: "Google Sans Flex"; font-weight: 100 1000; src: url(fonts/google-sans-flex-latin-full-normal.woff2) format("woff2"); }
+  :root { --ink: #14100c; --paper: #f1e2c0; --mustard: #f2bf45; --teal: #2b8c87; --orange: #d9662b; }
+  html, body { margin: 0; width: 1440px; height: 810px; overflow: hidden; background: #191310; }
+  #desk { position: absolute; inset: 0; background: radial-gradient(80% 70% at 50% 45%, #2a2019, #120d0a 75%); }
+  .sheet { position: absolute; left: 40px; top: 20px; width: 1360px; height: 770px; background: var(--paper); transform-origin: 0 0; box-shadow: 0 30px 80px rgba(0,0,0,.6), 0 0 0 1px rgba(0,0,0,.25); }
+  .sheet::before { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: .5;
+    background-image: radial-gradient(rgba(120,80,30,.18) 1px, transparent 1.2px); background-size: 6px 6px; }
+  .sheet::after { content: ""; position: absolute; inset: 0; pointer-events: none; mix-blend-mode: multiply; opacity: .35;
+    background: radial-gradient(120% 100% at 50% 50%, transparent 60%, rgba(120,70,20,.35)); }
+  .panel { position: absolute; border: 5px solid var(--ink); box-sizing: border-box; overflow: hidden; background: #000; box-shadow: 3px 4px 0 rgba(20,16,12,.35); }
+  .panel img.art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .panel.text { display: flex; align-items: center; justify-content: center; padding: 26px; text-align: center; }
+  .panel.text::before { content: ""; position: absolute; inset: 0; background-image: radial-gradient(rgba(0,0,0,.14) 1.4px, transparent 1.6px); background-size: 9px 9px; }
+  .panel.text .big { position: relative; font: 400 46px/1.02 "Bangers", "Google Sans Flex", sans-serif; letter-spacing: .02em; color: var(--ink); }
+  .panel.text .big small { display: block; margin-top: 12px; font: 700 19px/1.3 "Comic Neue", "Google Sans Flex", sans-serif; letter-spacing: .02em; text-transform: uppercase; }
+  .panel.screen { background: #0b0f17; }
+  .panel.screen img.feed { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .panel.screen::after { content: ""; position: absolute; inset: 0; pointer-events: none; box-shadow: inset 0 0 0 3px #0b0f17, inset 0 0 40px rgba(0,0,0,.45); }
+  .tab { position: absolute; z-index: 3; left: -5px; top: -5px; background: var(--ink); color: var(--paper); font: 400 15px/1 "Bangers", sans-serif; letter-spacing: .08em; padding: 7px 12px 6px; }
+  .cap { position: absolute; z-index: 4; box-sizing: border-box; background: var(--mustard); border: 3px solid var(--ink); padding: 9px 13px 8px; box-shadow: 4px 4px 0 var(--ink);
+    font: 700 17px/1.22 "Comic Neue", "Google Sans Flex", sans-serif; text-transform: uppercase; letter-spacing: .015em; color: var(--ink); transform-origin: 0 0; }
+  .cap.white { background: #fbf4e2; }
+  .cap.teal { background: var(--teal); color: #fbf4e2; }
+  .title { position: absolute; z-index: 4; font: 400 118px/.86 "Bangers", sans-serif; color: var(--paper); letter-spacing: .015em; -webkit-text-stroke: 3px var(--ink); paint-order: stroke fill; text-shadow: 7px 7px 0 var(--ink); }
+  .pagenum { position: absolute; right: 30px; bottom: 6px; font: 400 18px "Bangers", sans-serif; color: var(--ink); opacity: .7; letter-spacing: .1em; }
+  .part { position: absolute; left: 26px; top: -1px; transform: translateY(-100%); }
+  .sheet.cover { background: var(--mustard); }
+</style>
+</head>
+<body>
+<div id="desk"></div>
+<div id="stage"></div>
+<script>
+window.__ready = Promise.all([fetch('reel-marks.json').then((r) => r.json()), fetch('narration/durations.json').then((r) => (r.ok ? r.json() : {})).catch(() => ({}))])
+  .then(([j, d]) => { window.__reel = j; window.__durs = d; window.__build(); });
+window.__build = () => {
+/* Page spec. Coordinates are in sheet pixels (1360 × 770). Times are seconds from the page's start.
+   Screen panels play frames from the clean render (frames-clean/) between `from` and `to`, at `speed`,
+   starting when their beat begins. */
+const W = 1360, H = 770, VW = 1440, VH = 810, SX = 40, SY = 20, FPS = 30, TURN = 0.9;
+const at = (s) => Math.round(s * FPS);
+const REEL = window.__reel; // { marks, values } from reel-marks.json
+const V = REEL.values;
+const pingMins = Math.round(parseInt(V.ping.replace(/\D/g, ''), 10) / 555 * 60);
+const pingSpan = pingMins === 60 ? 'an hour' : pingMins % 60 === 0 ? `${['', 'one', 'two', 'three', 'four'][pingMins / 60]} hours` : `${pingMins} minutes`;
+const R = (name, { speed = 1, skip = 0, end = 0 } = {}) => ({ src: "frames-reel", from: REEL.marks[name].from + at(skip), to: REEL.marks[name].to - 1 - at(end), speed });
+const A = (from, to, speed = 1) => ({ src: "frames-clean", from: at(from), to: at(to), speed });
+const scr = (clip, label) => ({ ...clip, label });
+const PAGES = [
+  // ── Opening ──
+  { cls: "cover", panels: [{ id: "a", x: 0, y: 0, w: W, h: H, img: "p02-patch-board", bare: true }],
+    extra: `<div class="title" style="left:70px;top:120px">TWO PAIRS<br>OF HANDS</div>
+      <div class="cap white" style="left:76px;top:356px;width:420px;font-size:20px">A Knack design fiction · Mumbai &amp; Pune, 2035</div>
+      <div class="cap teal" style="left:76px;top:420px;width:380px">Every skill on Knack belongs to someone.</div>`,
+    beats: [ { p: "all", d: 6, say: 'Two Pairs of Hands. A Knack design fiction. Mumbai and Pune, twenty thirty-five.' } ] },
+
+  { part: "Prologue · 2035", panels: [
+      { id: "street", x: 26, y: 26, w: 1308, h: 450, img: "p18-street", caps: [{ t: "Mumbai, 2035. AI does most of the thinking now. It drafts, translates, calculates and decides.", x: .02, y: .05, w: 440, at: .6 }, { t: "Almost nobody uses their hands for work any more.", x: .66, y: .78, w: 400, at: 4.4 }] },
+      { id: "t1", x: 26, y: 492, w: 646, h: 252, text: `AI can't put a skill<br>into your hands.`, color: "var(--mustard)" },
+      { id: "t2", x: 688, y: 492, w: 646, h: 252, text: `So hands became<br>the scarce thing.<small>The last thing people have left to sell.</small>`, color: "var(--teal)" },
+    ], beats: [ { p: "street", d: 7.6, say: 'Mumbai, twenty thirty-five. A.I. does most of the thinking now. It drafts, translates, calculates, and decides. Almost nobody uses their hands for work any more.' }, { p: "t1", d: 2.8, say: "But A.I. can't put a skill into your hands." }, { p: "t2", d: 3.4, say: 'So hands became the scarce thing. The last thing people have left to sell.' }, { p: "all", d: 1.2 } ] },
+
+  // ── How Knack works ──
+  { part: "How Knack works · 1 · Reading a skill", panels: [
+      { id: "sig", x: 26, y: 26, w: 860, h: 484, img: "p19-signal", caps: [{ t: "Every movement starts as an electrical command from the brain.", x: .03, y: .05, w: 330, at: .6 }, { t: "On its way to the muscles, it can be read through the skin.", x: .55, y: .8, w: 360, at: 3.6 }] },
+      { id: "temple", x: 902, y: 26, w: 432, h: 234, text: `Temple patch<small>16 contacts read the brain's planning and timing, a split second before each move (EEG).</small>`, color: "#fbf4e2" },
+      { id: "arm", x: 902, y: 276, w: 432, h: 234, text: `Forearm patch<small>Reads which muscles fire, when and how hard (EMG), and how the wrist moves.</small>`, color: "#fbf4e2" },
+      { id: "strip", x: 26, y: 526, w: 1308, h: 218, text: `It records his body, not his kitchen.<small>No camera, no sound. Only the signals that make his hands move.</small>`, color: "var(--mustard)" },
+    ], beats: [ { p: "sig", d: 7.4, say: 'How does Knack work? Every movement starts as an electrical command from the brain. On its way to the muscles, it can be read through the skin.' }, { p: "temple", d: 3.4, say: "A patch on the temple reads the brain's planning and timing, a split second before each move." }, { p: "arm", d: 3.4, say: 'A patch on the forearm reads which muscles fire, when, and how hard. And how the wrist moves.' }, { p: "strip", d: 3, say: 'It records the body, not the kitchen. No camera, no sound. Only the signals that make the hands move.' }, { p: "all", d: 1.2 } ] },
+
+  { part: "How Knack works · 2 · Building a skill", panels: [
+      { id: "lab", x: 26, y: 26, w: 1308, h: 450, img: "p20-lab", caps: [{ t: "Knack lines up hundreds of hours into one model of the skill.", x: .02, y: .05, w: 380, at: .6 }, { t: "Not a video of his hands: a map of which muscles fire, how hard, and in what order.", x: .63, y: .74, w: 440, at: 3.6 }] },
+      { id: "cut", x: 26, y: 492, w: 646, h: 252, text: `Bad hours are cut.<small>Tiredness, tremor and mistakes are removed so no one learns them.</small>`, color: "var(--orange)" },
+      { id: "lic", x: 688, y: 492, w: 646, h: 252, text: `Then it's licensed.<small>Tested on volunteers, certified, and given a licence number. Now it's a product.</small>`, color: "var(--mustard)" },
+    ], beats: [ { p: "lab", d: 7.6, say: 'Knack lines up hundreds of hours of these signals into one model of the skill. Not a video of the hands, but a map of which muscles fire, how hard, and in what order.' }, { p: "cut", d: 3.2, say: 'Hours with tiredness, tremor or mistakes are cut, so no one learns them.' }, { p: "lic", d: 3.2, say: "Then the skill is tested on volunteers, certified, and given a licence number. Now it's a product." }, { p: "all", d: 1.2 } ] },
+
+  { part: "How Knack works · 3 · Streaming", panels: [
+      { id: "hand", x: 26, y: 26, w: 860, h: 484, img: "p21-guided-hand", caps: [{ t: "Nothing is uploaded into your brain.", x: .03, y: .05, w: 300, at: .6 }, { t: "The forearm patch nudges your muscles with tiny electrical pulses, timed to his. The temple patch primes the planning part of your brain.", x: .45, y: .66, w: 440, at: 2.6 }] },
+      { id: "cal", x: 902, y: 26, w: 432, h: 484, img: "p26-calibration", caps: [{ t: "Calibration maps his hand onto yours: smaller hand, slower reactions, different skin.", x: .06, y: .64, w: 360, at: 11.8 }] },
+      { id: "strip", x: 26, y: 526, w: 1308, h: 218, text: `Your body still does the work.<small>It's guided, like a hand on your hand.</small>`, color: "var(--teal)" },
+    ], beats: [ { p: "hand", d: 9, say: "To stream it, nothing is uploaded into your brain. The forearm patch nudges your muscles with tiny electrical pulses, timed to the expert's. The temple patch primes the part of your brain that plans movement." }, { p: "strip", d: 2.8, say: "Your body still does the work. It's guided, like a hand on your hand." }, { p: "cal", d: 4.6, say: "Calibration maps the expert's hand onto yours. A smaller hand, slower reactions, different skin." }, { p: "all", d: 1.2 } ] },
+
+  { part: "How Knack works · 4 · Why it fades", panels: [
+      { id: "glass", x: 26, y: 26, w: 860, h: 484, img: "p22-hourglass", caps: [{ t: "Guidance makes you good while it's on, but you learn very little.", x: .03, y: .05, w: 300, at: .6 }, { t: "Motor scientists call it the guidance effect. About 10 to 20% stays.", x: .62, y: .74, w: 310, at: 3.6 }] },
+      { id: "drift", x: 902, y: 26, w: 432, h: 484, text: `Lean on it,<br>lose your own.<small>Use guidance too often and your own unaided steadiness slips.</small>`, color: "var(--orange)" },
+      { id: "why", x: 26, y: 526, w: 1308, h: 218, text: `Why hands, not knowledge?<small>Knowledge lives deep in the brain, out of any patch's reach, and AI does the thinking anyway. A patch could stream an accent, never a vocabulary.</small>`, color: "#fbf4e2" },
+    ], beats: [ { p: "glass", d: 7.2, say: "And it fades. Guidance makes you good while it's on, but you learn very little. Motor scientists call this the guidance effect. Only about ten to twenty percent stays." }, { p: "drift", d: 3.6, say: 'Lean on it too often, and your own unaided steadiness starts to slip.' }, { p: "why", d: 5.4, say: "Why hands, and not knowledge? Knowledge lives deep in the brain, out of any patch's reach. And A.I. does the thinking anyway. A patch could stream an accent, but never a vocabulary." }, { p: "all", d: 1.2 } ] },
+
+  { part: "How Knack works · 5 · Protection", panels: [
+      { id: "lock", x: 26, y: 26, w: 860, h: 718, img: "p23-lockout", caps: [{ t: "Each skill is encrypted to one session. When the session ends, the key expires.", x: .03, y: .04, w: 380, at: .6 }, { t: "Try to keep it, and the patch locks you out for 72 hours and tells the skill's owner.", x: .5, y: .82, w: 400, at: 4 }] },
+      { id: "box", x: 902, y: 26, w: 432, h: 400, img: "p27-box", caps: [{ t: "In the box: the patch, your printed shell, a dock and 30 gel pads.", x: .06, y: .72, w: 360, at: 8.8 }] },
+      { id: "price", x: 902, y: 442, w: 432, h: 302, text: `₹48,900<small>for the patch. Skills are rented by the hour.</small>`, color: "var(--mustard)" },
+    ], beats: [ { p: "lock", d: 8.2, say: "Every skill is encrypted to a single session. When the session ends, the key expires. Try to keep it, and the patch locks you out for seventy-two hours, and tells the skill's owner." }, { p: "box", d: 3.6, say: 'In the box: the patch, a printed shell, a charging dock, and thirty gel pads.' }, { p: "price", d: 2.6, say: 'The patch costs forty-eight thousand, nine hundred rupees. The skills are rented by the hour.' }, { p: "all", d: 1.2 } ] },
+
+  // ── Part one: Arjun ──
+  { part: "Part one · The one who records", panels: [
+      { id: "tall", x: 26, y: 26, w: 380, h: 718, img: "p04-arjun-phone", caps: [{ t: "One night, he applies to record his hands for Knack.", x: .06, y: .78, w: 320, at: 14.4 }] },
+      { id: "kit", x: 422, y: 26, w: 912, h: 440, img: "p01-arjun-kitchen", caps: [{ t: "Mumbai, March 2035.", x: .03, y: .05, w: 250, at: .8 }, { t: "Chef Arjun Mehra, 51. Twenty-two years in commercial kitchens.", x: .55, y: .76, w: 380, at: 2.2 }] },
+      { id: "wrist", x: 422, y: 482, w: 300, h: 262, img: "p03-arjun-wrist", caps: [{ t: "His wrists are starting to fail him.", x: .06, y: .06, w: 250, at: 6.4 }] },
+      { id: "txt", x: 738, y: 482, w: 596, h: 262, text: `When his hands stop, everything they know stops with them.`, color: "var(--mustard)" },
+    ], beats: [ { p: "kit", d: 5.4, say: 'Part one. The one who records. Mumbai, March. Chef Arjun Mehra, fifty-one. Twenty-two years in commercial kitchens.' }, { p: "wrist", d: 3.6, say: 'His wrists are starting to fail him.' }, { p: "txt", d: 3.8, say: 'When his hands stop, everything they know stops with them.' }, { p: "tall", d: 4.2, say: 'One night, he applies to record his hands for Knack.' }, { p: "all", d: 1.2 } ] },
+
+  { panels: [
+      { id: "s", x: 26, y: 26, w: 860, h: 484, screen: scr(A(21, 48.5, 2), "Knack for Experts · his application"),
+        caps: [{ t: "Knack checks his kitchens, his guild level and his hands.", x: .03, y: .76, w: 380, at: .6 }, { t: "He keeps 30% of every hour his hands are rented: ₹555. He bans their use for weapons training.", x: .5, y: .04, w: 410, at: 5.6 }] },
+      { id: "sign", x: 902, y: 26, w: 432, h: 484, img: "p06-arjun-sign", caps: [{ t: "He signs without reading it twice.", x: .06, y: .05, w: 300, at: 18.2 }] },
+      { id: "clause", x: 26, y: 526, w: 1308, h: 218, text: `Clause 14.2<small>Knack may combine your recordings with recordings from other experts to build new skills.</small>`, color: "#fbf4e2" },
+    ], beats: [ { p: "s", d: 14, say: 'Knack checks his kitchens, his guild level, and his hands. For every hour someone rents his hands, he keeps thirty percent: five hundred and fifty-five rupees. He bans their use for weapons training.' }, { p: "clause", d: 4, say: "Then there's clause fourteen point two. Knack may combine his recordings with other experts', to build new skills." }, { p: "sign", d: 3.4, say: 'He signs, without reading it twice.' }, { p: "all", d: 1.2 } ] },
+
+  { panels: [
+      { id: "svc", x: 26, y: 26, w: 1308, h: 360, img: "p05-arjun-service", caps: [{ t: "For six months, two patches record him through 156 dinner services.", x: .02, y: .06, w: 420, at: .6 }, { t: "He just cooks.", x: .78, y: .78, w: 200, at: 2.6 }] },
+      { id: "s", x: 26, y: 402, w: 610, h: 342, screen: scr(A(48.5, 62.6, 1.25), "Recording"),
+        caps: [{ t: "Knack is watching his right wrist too.", x: .45, y: .05, w: 300, at: 10 }] },
+      { id: "s2", x: 652, y: 402, w: 682, h: 342, screen: scr(A(64, 86, 1.8), "Review and publish"),
+        caps: [{ t: "212 hours are cut. The rest becomes a product: ₹1,850 an hour.", x: .04, y: .72, w: 380, at: 17.6 }] },
+    ], beats: [ { p: "svc", d: 4.6, say: 'For six months, two patches record him through a hundred and fifty-six dinner services. He just cooks.' }, { p: "s", d: 12, say: 'The patches read every cut. And Knack is watching his right wrist, too. The strain keeps rising.' }, { p: "s2", d: 12.4, say: 'In review, two hundred and twelve hours are cut. The rest becomes a product, at eighteen hundred and fifty rupees an hour.' }, { p: "all", d: 1.2 } ] },
+
+  { panels: [
+      { id: "bal", x: 26, y: 26, w: 380, h: 718, img: "p07-arjun-balcony", caps: [{ t: "Five months later.", x: .07, y: .05, w: 240, at: .6 }, { t: "Every minute someone streams his hands, he is paid.", x: .07, y: .76, w: 320, at: 2 }] },
+      { id: "s", x: 422, y: 26, w: 912, h: 513, screen: scr(A(90.6, 104.2, 1.2), "His earnings"),
+        caps: [{ t: "₹3,10,245 in October. His hands are working in kitchens across India.", x: .03, y: .78, w: 470, at: 5 }] },
+      { id: "txt", x: 422, y: 555, w: 912, h: 189, text: `He no longer works full services.`, color: "#fbf4e2" },
+    ], beats: [ { p: "bal", d: 4.4, say: 'Five months later. Every minute someone streams his hands, he is paid.' }, { p: "s", d: 11.6, say: 'Three lakh, ten thousand rupees in October. Right now, his hands are working in kitchens across India.' }, { p: "txt", d: 2.6, say: 'He no longer works full services.' }, { p: "all", d: 1.2 } ] },
+
+  { panels: [
+      { id: "frown", x: 26, y: 26, w: 718, h: 718, img: "p08-arjun-chart", caps: [{ t: "Then, in August…", x: .05, y: .05, w: 240, at: .6 }] },
+      { id: "s", x: 760, y: 26, w: 574, h: 323, screen: scr(A(104, 117, 1.1), "What changed in August"),
+        caps: [{ t: "Knack launched a cheaper knife skill: ₹340 an hour.", x: .04, y: .64, w: 330, at: 3.6 }, { t: "Built from 3,100 sessions. 412 of those hours were his.", x: .3, y: .04, w: 360, at: 8.6 }] },
+      { id: "txt", x: 760, y: 365, w: 574, h: 379, text: `Clause 14.2.<small>His own hands are being used to replace him.</small>`, color: "var(--orange)" },
+    ], beats: [ { p: "frown", d: 3.4, say: 'Then, in August, something changes.' }, { p: "s", d: 11.8, say: 'Knack launches a cheaper knife skill, at three hundred and forty rupees an hour. It was built from three thousand one hundred sessions. Four hundred and twelve of those hours were his.' }, { p: "txt", d: 3.6, say: 'Clause fourteen point two. His own hands are being used to replace him.' }, { p: "all", d: 1.2 } ] },
+
+  // ── Part two: Asha ──
+  { part: "Part two · The one who rents", panels: [
+      { id: "kit", x: 26, y: 26, w: 1308, h: 400, img: "p09-asha-kitchen", caps: [{ t: "Pune, November 2035. Asha Rao, 34, has cooked at home all her life.", x: .02, y: .05, w: 420, at: .6 }, { t: "On Monday she starts a trial shift in a restaurant kitchen.", x: .64, y: .74, w: 400, at: 3.2 }] },
+      { id: "msg", x: 26, y: 442, w: 300, h: 302, img: "p10-asha-message", caps: [{ t: "Her cousin sends her a link.", x: .07, y: .06, w: 230, at: 6 }] },
+      { id: "s", x: 342, y: 442, w: 537, h: 302, screen: scr(R("studio", { speed: 1.6 }), "Shape studio"),
+        caps: [{ t: "First she designs the shell the patch wears.", x: .04, y: .05, w: 300, at: 9.6 }] },
+      { id: "txt", x: 895, y: 442, w: 439, h: 302, text: `She has<br>eight days.`, color: "var(--mustard)" },
+    ], beats: [ { p: "kit", d: 5.8, say: 'Part two. The one who rents. Pune, November. Asha Rao, thirty-four, has cooked at home all her life. On Monday, she starts a trial shift in a restaurant kitchen.' }, { p: "msg", d: 3.4, say: 'Her cousin sends her a link.' }, { p: "s", d: 10, say: 'First, she designs the shell the patch will wear. A satin, saffron tear drop.' }, { p: "txt", d: 2.4, say: 'She has eight days.' }, { p: "all", d: 1.2 } ] },
+
+  { panels: [
+      { id: "s", x: 26, y: 26, w: 860, h: 484, screen: scr(R("consent", { speed: 1 }), "Her face, before she shares it"),
+        caps: [{ t: "To try the shell on her own face, she must agree to how the scan is used.", x: .03, y: .76, w: 420, at: .6 }] },
+      { id: "t", x: 902, y: 26, w: 432, h: 484, text: `₹500 off<small>if she lets Knack's partners keep her face scan for three years. The box is unticked. She says no.</small>`, color: "var(--orange)" },
+      { id: "s2", x: 26, y: 526, w: 646, h: 218, screen: scr(R("checkout", { speed: 1.8 }), "Checkout") ,
+        caps: [{ t: `Delivery to Pune. ${V.total} by e₹ wallet.`, x: .03, y: .06, w: 320, at: 13 }] },
+      { id: "s3", x: 688, y: 526, w: 646, h: 218, screen: scr(R("tracking", { speed: 1.2 }), "Order tracking"),
+        caps: [{ t: "Printed overnight. A drone drop for tomorrow.", x: .4, y: .06, w: 330, at: 19.6 }] },
+    ], beats: [ { p: "s", d: 6.8, say: 'To try the shell on her own face, she has to agree to how the face scan is used.' }, { p: "t", d: 3.6, say: "There's an offer: five hundred rupees off, if Knack's partners can keep her face scan for three years. The box is unticked. She says no." }, { p: "s2", d: 8.6, say: 'Delivery to Pune. Forty-nine thousand, three hundred and ninety-nine rupees, from her digital rupee wallet.' }, { p: "s3", d: 5.6, say: 'Her shell is printed overnight, for a drone drop the next day.' }, { p: "all", d: 1.2 } ] },
+
+  { panels: [
+      { id: "drone", x: 26, y: 26, w: 1308, h: 360, img: "p11-drone", caps: [{ t: "Day 2. The drone lands on the terrace.", x: .64, y: .76, w: 380, at: .6 }] },
+      { id: "unbox", x: 26, y: 402, w: 400, h: 342, img: "p12-asha-unbox", caps: [{ t: "It's smaller than she expected.", x: .06, y: .06, w: 250, at: 4.2 }] },
+      { id: "s", x: 442, y: 402, w: 446, h: 342, screen: scr(R("pair", { speed: 1.3 }), "Skin prep and pairing"),
+        caps: [{ t: "Trim, clean, dry. Then she taps her phone on the box.", x: .04, y: .05, w: 330, at: 7.6 }] },
+      { id: "press", x: 904, y: 402, w: 430, h: 342, img: "p13-asha-patch", caps: [{ t: "One test pulse. A faint tingle.", x: .08, y: .78, w: 240, at: 14.6 }] },
+    ], beats: [ { p: "drone", d: 4.2, say: 'Day two. The drone lands on the terrace.' }, { p: "unbox", d: 3.2, say: 'The patch is smaller than she expected.' }, { p: "s", d: 7.2, say: "She trims, cleans and dries the spot on her temple. Then she taps her phone on the box, and the patch knows it's hers." }, { p: "press", d: 3, say: 'One test pulse. A faint tingle.' }, { p: "all", d: 1.2 } ] },
+
+  { panels: [
+      { id: "s", x: 26, y: 26, w: 860, h: 484, screen: scr(R("calibrate", { speed: 1 }), "Calibration"),
+        caps: [{ t: "Calibration measures how her muscles answer, so his signals can be scaled to her body.", x: .03, y: .04, w: 420, at: .6 }] },
+      { id: "cal", x: 902, y: 26, w: 432, h: 484, img: "p26-calibration", caps: [{ t: "Her hand is smaller. Her reactions are slower.", x: .06, y: .72, w: 330, at: 10.8 }] },
+      { id: "s2", x: 26, y: 526, w: 1308, h: 218, screen: scr(R("data", { speed: 1.7, skip: 2.4 }), "Her data") },
+    ], beats: [ { p: "s", d: 10, say: "Calibration measures how her muscles answer, so the expert's signals can be scaled to her body." }, { p: "cal", d: 3.2, say: 'Her hand is smaller than his. Her reactions are slower.' }, { p: "all", d: 1.2 } ] },
+
+  { panels: [
+      { id: "s", x: 26, y: 26, w: 1308, h: 470, screen: scr(R("data", { speed: 1.3, skip: 3.6 }), "Her data"),
+        caps: [{ t: "Knack already has a profile of her: her phone test, her health record, her smart ring…", x: .02, y: .04, w: 430, at: .6 }, { t: "…and her new employer, who pays 20% of her plan and sees every hour she streams. Switch a source off and the plan tells her what it costs.", x: .6, y: .7, w: 500, at: 5.2 }] },
+      { id: "t", x: 26, y: 512, w: 1308, h: 232, text: `She leaves it on.<small>Money is tight.</small>`, color: "var(--mustard)" },
+    ], beats: [ { p: "s", d: 11.6, say: 'Then, a surprise. Knack already has a profile of her, from a phone test, her health record, and her smart ring. And from her new employer, who pays twenty percent of her plan, and sees every hour she streams. If she switches a source off, the plan tells her what it will cost.' }, { p: "t", d: 2.6, say: 'She leaves it on. Money is tight.' }, { p: "all", d: 1.4 } ] },
+
+  { panels: [
+      { id: "s", x: 26, y: 26, w: 860, h: 484, screen: scr(R("vault", { speed: 1.6 }), "The vault"),
+        caps: [{ t: "The vault: skills recorded from real people, paid by the minute.", x: .03, y: .04, w: 380, at: .6 }, { t: "She has never met him. She chooses his hands.", x: .5, y: .76, w: 380, at: 6.4 }] },
+      { id: "s2", x: 902, y: 26, w: 432, h: 484, screen: scr(R("plan", { speed: 1.5 }), "Her plan"),
+        caps: [{ t: "Her plan is built from her body, not her deadline: short sessions, long rests, a reason for every limit.", x: .06, y: .62, w: 360, at: 11.2 }] },
+      { id: "s3", x: 26, y: 526, w: 1308, h: 218, screen: scr(R("pay", { speed: 1.3 }), "Before she pays"),
+        caps: [{ t: `Before she can pay ${V.plan}, she must confirm she knows what streaming does to her.`, x: .03, y: .06, w: 500, at: 19 }] },
+    ], beats: [ { p: "s", d: 10.4, say: 'In the vault, every skill was recorded from a real person, who is paid by the minute. She has never met Chef Arjun. She chooses his hands.' }, { p: "s2", d: 7.6, say: 'Her plan is built from her body, not her deadline. Short sessions, long rests, and a reason for every limit.' }, { p: "s3", d: 5.4, say: 'Before she can pay eight thousand, four hundred and ninety-two rupees, she has to confirm she knows what streaming does to her.' }, { p: "all", d: 1.2 } ] },
+
+  { panels: [
+      { id: "s", x: 26, y: 26, w: 646, h: 363, screen: scr(R("safety", { speed: 1.4 }), "Safety guide"),
+        caps: [{ t: "The safety guide is optional. Nine in ten people skip it.", x: .03, y: .7, w: 360, at: .6 }] },
+      { id: "s2", x: 688, y: 26, w: 646, h: 363, screen: scr(R("lockout", { speed: 1 }), "Lockout practice"),
+        caps: [{ t: "Asha tries the practice run: what happens if anyone tries to keep a skill.", x: .03, y: .04, w: 380, at: 4 }] },
+      { id: "s3", x: 26, y: 405, w: 646, h: 339, screen: scr(R("hardware", { speed: 1.2 }), "Inside the patch"),
+        caps: [{ t: "Sixteen gold contacts read her. A sweat seal keeps the shower out.", x: .03, y: .74, w: 380, at: 13.4 }] },
+      { id: "t", x: 688, y: 405, w: 646, h: 339, text: `Stream stopped.<small>Copy deleted. Streaming off for 72 hours, and the owner is told.</small>`, color: "var(--orange)" },
+    ], beats: [ { p: "s", d: 3.4, say: 'The safety guide is optional. Nine in ten people skip it.' }, { p: "s2", d: 9, say: 'Asha tries the practice run: what happens if anyone tries to keep a skill.' }, { p: "t", d: 2.6, say: "The stream stops. The copy is deleted. Streaming is off for seventy-two hours, and the skill's owner is told." }, { p: "s3", d: 5.6, say: 'Inside the patch, sixteen gold contacts read her muscles, and a sweat seal keeps the shower out.' }, { p: "all", d: 1.2 } ] },
+
+  { panels: [
+      { id: "chop", x: 26, y: 26, w: 1308, h: 400, img: "p14-asha-chop", caps: [{ t: "Day 8, 6:40 am.", x: .02, y: .05, w: 220, at: .6 }, { t: `For ${V.mins} minutes, her hands move like his.`, x: .62, y: .78, w: 420, at: 2 }] },
+      { id: "s", x: 26, y: 442, w: 646, h: 302, screen: scr(R("session", { speed: 1 }), "Streaming now"),
+        caps: [{ t: "The patch reads her muscles as it guides them.", x: .03, y: .06, w: 330, at: 5.6 }] },
+      { id: "trial", x: 688, y: 442, w: 646, h: 302, img: "p15-asha-trial", caps: [{ t: "At ten, the head chef watches. He says nothing. That's a good sign.", x: .45, y: .06, w: 330, at: 11.2 }] },
+    ], beats: [ { p: "chop", d: 5.2, say: 'Day eight. Six forty in the morning. For forty-five minutes, her hands move like his.' }, { p: "s", d: 5.8, say: 'The patch reads her muscles as it guides them.' }, { p: "trial", d: 4.6, say: "At ten, the head chef watches her work. He says nothing. That's a good sign." }, { p: "all", d: 1.2 } ] },
+
+  { panels: [
+      { id: "s", x: 26, y: 26, w: 1012, h: 569, screen: scr(R("debrief1", { speed: 1 }), "After the session"),
+        caps: [{ t: "Afterwards, his hands leave hers.", x: .03, y: .82, w: 330, at: .8 }, { t: `${V.kept}% stays with her. Keeping it would cost ${V.price}.`, x: .58, y: .82, w: 400, at: 9.6 }] },
+      { id: "side", x: 1054, y: 26, w: 280, h: 569, text: `She lets it fade.`, color: "var(--teal)" },
+      { id: "strip", x: 26, y: 611, w: 1308, h: 133, text: `A retention licence would make it hers, legally. Arjun would get 30%.`, color: "#fbf4e2" },
+    ], beats: [ { p: "s", d: 15.4, say: 'Afterwards, his hands leave hers. Eighteen percent stays with her. Keeping it would cost eighty-three thousand, three hundred rupees.' }, { p: "strip", d: 3, say: 'A retention licence would make it legally hers. Arjun would get thirty percent.' }, { p: "side", d: 2.4, say: 'She lets it fade.' }, { p: "all", d: 1.2 } ] },
+
+  // ── Part three: weeks later ──
+  { part: "Part three · Weeks later", panels: [
+      { id: "tremor", x: 26, y: 26, w: 1308, h: 400, img: "p24-asha-tremor", caps: [{ t: "Three sessions later.", x: .02, y: .05, w: 260, at: .6 }, { t: "Without the patch, her own hand isn't as steady as it was.", x: .6, y: .76, w: 440, at: 2.6 }] },
+      { id: "s", x: 26, y: 442, w: 860, h: 302, screen: scr(R("debrief3", { speed: 1 }), "Her third debrief"),
+        caps: [{ t: `Her own steadiness: ${V.steady}.`, x: .5, y: .06, w: 360, at: 11 }] },
+      { id: "t", x: 902, y: 442, w: 432, h: 302, text: `At 10 points down, Knack pauses her for a week.`, color: "var(--orange)" },
+    ], beats: [ { p: "tremor", d: 5.4, say: "Part three. Weeks later. Three sessions in, without the patch, her own hand isn't as steady as it was." }, { p: "s", d: 10, say: 'Her own steadiness has dropped, from sixty percent to fifty-six.' }, { p: "t", d: 2.8, say: 'At ten points down, Knack will pause her for a week.' }, { p: "all", d: 1.2 } ] },
+
+  { panels: [
+      { id: "split", x: 26, y: 26, w: 1308, h: 420, img: "p16-split", caps: [{ t: "Her third session. Mumbai and Pune, the same two hours.", x: .37, y: .05, w: 380, at: .6 }] },
+      { id: "s", x: 26, y: 462, w: 502, h: 282, screen: scr(R("ping", { speed: 1 }), "His phone"),
+        caps: [{ t: `Arjun's phone lights up: <span style="white-space:nowrap">+${V.ping}.</span>`, x: .04, y: .72, w: 400, at: 6.6 }] },
+      { id: "txt", x: 544, y: 462, w: 790, h: 282, text: `A cook in Pune.<small>He will never know her name.</small>`, color: "var(--mustard)" },
+    ], beats: [ { p: "split", d: 4.6, say: 'Mumbai and Pune. The same two hours.' }, { p: "s", d: 9, say: "Arjun's phone lights up. One thousand, one hundred and ten rupees. A cook in Pune streamed his knife skills." }, { p: "txt", d: 3, say: 'He will never know her name.' }, { p: "all", d: 1.2 } ] },
+
+  { panels: [
+      { id: "job", x: 26, y: 26, w: 646, h: 718, text: `Asha gets the job.<small>Her employer can see every hour she streams.</small>`, color: "var(--mustard)" },
+      { id: "arj", x: 688, y: 26, w: 646, h: 718, text: `Arjun earns ${V.ping}<small>for ${pingSpan} he didn't work. His wrist aches. The skill built from his hours costs less than he does.</small>`, color: "var(--teal)" },
+    ], beats: [ { p: "job", d: 3, say: 'Asha gets the job. Her employer can see every hour she streams.' }, { p: "arj", d: 3, say: "Arjun earns one thousand, one hundred and ten rupees, for two hours he didn't work. His wrist aches. And the skill built from his hours costs less than he does." }, { p: "all", d: 1.2 } ] },
+
+  // ── Epilogue ──
+  { cls: "cover", panels: [{ id: "hands", x: 0, y: 0, w: W, h: H, img: "p17-hands", bare: true }],
+    extra: `<div class="cap white" style="left:330px;top:56px;width:700px;font-size:30px;text-align:center;padding:16px 20px">Who owns a skill once it has been in your hands?</div>`,
+    beats: [ { p: "all", d: 6, say: 'Who owns a skill, once it has been in your hands?' } ] },
+
+  { cls: "cover", panels: [], extra: `<div class="title" style="left:0;right:0;top:250px;text-align:center;font-size:150px">GET THE KNACK.</div>
+      <div class="cap white" style="left:430px;top:450px;width:500px;text-align:center;font-size:19px">A design fiction set in 2035. Not a real product.</div>`,
+    beats: [ { p: "all", d: 5, say: 'Get the knack. A design fiction, set in twenty thirty-five.' } ] },
+];
+
+/* Build the DOM. */
+const stage = document.getElementById("stage");
+PAGES.forEach((pg, i) => {
+  const el = document.createElement("div");
+  el.className = "sheet" + (pg.cls ? " " + pg.cls : "");
+  el.style.display = "none";
+  let html = "";
+  for (const p of pg.panels) {
+    const style = `left:${p.x}px;top:${p.y}px;width:${p.w}px;height:${p.h}px;${p.color ? `background:${p.color};` : ""}${p.bare ? "border:0;box-shadow:none;" : ""}`;
+    if (p.img) html += `<div class="panel" data-id="${p.id}" style="${style}"><img class="art" src="panels/${p.img}.jpg">`;
+    else if (p.screen) html += `<div class="panel screen" data-id="${p.id}" style="${style}"><img class="feed"><div class="tab">${p.screen.label}</div>`;
+    else html += `<div class="panel text" data-id="${p.id}" style="${style}"><div class="big" style="${p.color === "var(--teal)" || p.color === "var(--orange)" ? "color:#fbf4e2" : ""}">${p.text}</div>`;
+    html += `</div>`;
+    for (const [k, c] of (p.caps || []).entries()) {
+      html += `<div class="cap" data-cap="${p.id}-${k}" style="left:${p.x + c.x * p.w}px;top:${p.y + c.y * p.h}px;width:${c.w}px">${c.t}</div>`;
+    }
+  }
+  if (pg.part) html += `<div class="cap teal part" style="font:400 20px/1 Bangers, sans-serif;letter-spacing:.08em;padding:9px 14px 7px">${pg.part}</div>`;
+  if (pg.extra) html += pg.extra;
+  if (!pg.cls) html += `<div class="pagenum">${i}</div>`;
+  el.innerHTML = html;
+  stage.appendChild(el);
+  pg.el = el;
+  // Narration sets the pace: a spoken beat lasts as long as its line, plus a breath.
+  pg.beats.forEach((b, k) => { b.key = `${i}-${k}`; const sec = (window.__durs || {})[b.key]; if (b.say && sec) b.d = Math.max(2.2, sec + 0.9); });
+  pg.dur = pg.beats.reduce((a, b) => a + b.d, 0);
+  let t = 0;
+  for (const b of pg.beats) { b.t0 = t; t += b.d; }
+  // Captions appear in order through the beat that focuses their panel (or the overview beat).
+  for (const p of pg.panels) {
+    const caps = p.caps || [];
+    const b = pg.beats.find((x) => x.p === p.id) || pg.beats.find((x) => x.p === "all") || pg.beats[0];
+    caps.forEach((c, k) => { c.at = b.t0 + 0.35 + k * Math.max(0.8, (b.d - 1) / caps.length); });
+    // Screen clips stretch or squeeze to fill their beat.
+    if (p.screen) { const len = p.screen.to - p.screen.from; p.screen.speed = Math.min(2.6, Math.max(0.7, len / (b.d * FPS))); }
+  }
+});
+let acc = 0;
+for (const pg of PAGES) { pg.start = acc; acc += pg.dur + TURN; }
+const TOTAL = acc - TURN;
+window.__total = TOTAL;
+window.__say = PAGES.flatMap((pg) => pg.beats.filter((b) => b.say).map((b) => ({ key: b.key, text: b.say })));
+window.__timeline = PAGES.flatMap((pg) => pg.beats.filter((b) => b.say).map((b) => ({ key: b.key, start: pg.start + b.t0 })));
+window.__pages = PAGES.map((pg) => ({ start: pg.start, dur: pg.dur }));
+
+const ease = (k) => (k < .5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2);
+const back = (k) => { const c = 1.7; return 1 + (c + 1) * Math.pow(k - 1, 3) + c * Math.pow(k - 1, 2); };
+function cam(pg, b) {
+  if (b.p === "all") return { s: 1, cx: SX + W / 2, cy: SY + H / 2 };
+  const r = pg.panels.find((p) => p.id === b.p);
+  const s = Math.min(.9 * VW / r.w, .86 * VH / r.h, 2.5);
+  return { s, cx: SX + r.x + r.w / 2, cy: SY + r.y + r.h / 2 };
+}
+function camAt(pg, t) {
+  let i = pg.beats.findIndex((b) => t < b.t0 + b.d); if (i < 0) i = pg.beats.length - 1;
+  const b = pg.beats[i], to = cam(pg, b), from = i ? cam(pg, pg.beats[i - 1]) : (pg.cls ? to : { s: 1, cx: SX + W / 2, cy: SY + H / 2 });
+  const k = ease(Math.min(1, (t - b.t0) / 1.1));
+  const drift = 1 + .018 * Math.min(1, (t - b.t0) / b.d);
+  const s = (from.s + (to.s - from.s) * k) * drift, cx = from.cx + (to.cx - from.cx) * k, cy = from.cy + (to.cy - from.cy) * k;
+  return { s, x: VW / 2 - cx * s, y: VH / 2 - cy * s };
+}
+const SRC = new URLSearchParams(location.search).get("src") || "frames-clean";
+const frameUrl = (n) => `${SRC}/${String(n).padStart(6, "0")}.jpg`;
+async function setPage(pg, t, offsetX, rot) {
+  const el = pg.el, c = camAt(pg, Math.max(0, Math.min(pg.dur, t)));
+  el.style.display = "block";
+  // The sheet sits at the origin; the camera maps desk coordinates (sheet + SX, SY) to the viewport.
+  el.style.left = "0px"; el.style.top = "0px";
+  el.style.transform = `translate(${c.x + SX * c.s + offsetX}px, ${c.y + SY * c.s}px) scale(${c.s}) rotate(${rot}deg)`;
+  // Captions pop in at their time.
+  for (const p of pg.panels) for (const [k, cp] of (p.caps || []).entries()) {
+    const n = el.querySelector(`[data-cap="${p.id}-${k}"]`), d = t - cp.at;
+    n.style.opacity = d <= 0 ? 0 : Math.min(1, d / .18);
+    n.style.transform = d <= 0 ? "scale(.6)" : `scale(${.6 + .4 * back(Math.min(1, d / .35))}) rotate(${-.6 + .6 * Math.min(1, d / .35)}deg)`;
+  }
+  // Screen panels play from their beat's start.
+  const waits = [];
+  for (const p of pg.panels) if (p.screen) {
+    const b = pg.beats.find((x) => x.p === p.id) || { t0: 0 }, sc = p.screen;
+    const n = Math.min(sc.to, sc.from + Math.max(0, Math.floor((t - b.t0) * FPS * sc.speed)));
+    const img = el.querySelector(`[data-id="${p.id}"] img.feed`), url = `${sc.src}/${String(n).padStart(6, "0")}.jpg`;
+    if (img.getAttribute("src") !== url) { img.setAttribute("src", url); waits.push(img.decode().catch(() => {})); }
+  }
+  return Promise.all(waits);
+}
+window.__setTime = async (T) => {
+  for (const pg of PAGES) pg.el.style.display = "none";
+  const i = PAGES.findIndex((pg, k) => T < pg.start + pg.dur + TURN || k === PAGES.length - 1);
+  const pg = PAGES[i], t = T - pg.start;
+  if (t <= pg.dur || i === PAGES.length - 1) return setPage(pg, t, 0, 0);
+  // Page turn: the page slides off to the left as the next one slides in.
+  const k = ease((t - pg.dur) / TURN), nx = PAGES[i + 1];
+  return Promise.all([setPage(pg, pg.dur, -1600 * k, -4 * k), setPage(nx, 0, 1600 * (1 - k), 4 * (1 - k))]);
+};
+};
+</script>
+</body>
+</html>
