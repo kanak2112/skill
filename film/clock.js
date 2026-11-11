@@ -85,6 +85,7 @@
     el.style.opacity = 0;
     setTimeout(() => { if (capText !== text) return; el.firstChild.textContent = text || ''; el.style.opacity = text ? 1 : 0; }, 450);
   };
+  window.__capPos = (pos) => { mount(); const el = document.getElementById('film-cap'); el.style.top = pos === 'top' ? '36px' : 'auto'; el.style.bottom = pos === 'top' ? 'auto' : '52px'; };
   // c: { eyebrow, title, body, num, size, dur }. A new card restarts its own entrance and slow drift.
   window.__card = (c) => {
     mount();
