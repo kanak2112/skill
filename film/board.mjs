@@ -7,7 +7,7 @@ const { chromium } = createRequire(process.env.NODE_PATH + '/')('playwright');
 const DIR = new URL('.', import.meta.url).pathname;
 const OUT = DIR + (process.env.OUT || 'board-frames') + '/';
 const SHARDS = +process.env.SHARDS || 1, SHARD = +process.env.SHARD || 0, ONLY = process.env.ONLY;
-if (SHARD === 0 && !ONLY) rmSync(OUT, { recursive: true, force: true });
+if (SHARD === 0 && !ONLY && !process.env.ONLYPAGES) rmSync(OUT, { recursive: true, force: true });
 mkdirSync(OUT, { recursive: true });
 const b = await chromium.launch();
 const p = await b.newPage({ viewport: { width: 1440, height: 810 }, deviceScaleFactor: 4 / 3 });
@@ -20,7 +20,10 @@ await p.evaluate(async () => {
 const total = await p.evaluate(() => window.__total);
 const N = Math.ceil(total * 30);
 const from = Math.floor((N * SHARD) / SHARDS), to = Math.floor((N * (SHARD + 1)) / SHARDS);
-const list = ONLY ? ONLY.split(',').map(Number) : Array.from({ length: to - from }, (_, i) => from + i);
+// ONLYPAGES=5,8 re-renders just those pages (and the page turns into and out of them).
+const pages = await p.evaluate(() => window.__pages);
+const pick = process.env.ONLYPAGES ? process.env.ONLYPAGES.split(',').flatMap((k) => { const pg = pages[+k]; const a = Math.floor((pg.start - 0.9) * 30), z = Math.ceil((pg.start + pg.dur + 0.9) * 30); return Array.from({ length: z - a + 1 }, (_, i) => a + i); }).filter((f) => f >= 0 && f < N) : null;
+const list = ONLY ? ONLY.split(',').map(Number) : pick ? pick.filter((f, i) => i % SHARDS === SHARD) : Array.from({ length: to - from }, (_, i) => from + i);
 const cdp = await p.context().newCDPSession(p);
 for (const f of list) {
   await p.evaluate((t) => window.__setTime(t), f / 30);

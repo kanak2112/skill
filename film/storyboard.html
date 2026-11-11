@@ -87,7 +87,7 @@ const PAGES = [
 
   { panels: [
       { id: "bal", x: 26, y: 26, w: 380, h: 718, img: "p07-arjun-balcony", caps: [{ t: "Five months later.", x: .07, y: .05, w: 240, at: .6 }, { t: "Every minute someone streams his hands, he is paid.", x: .07, y: .76, w: 320, at: 2 }] },
-      { id: "s", x: 422, y: 26, w: 912, h: 513, screen: { from: at(88), to: at(104), speed: 1.2, label: "His earnings" },
+      { id: "s", x: 422, y: 26, w: 912, h: 513, screen: { from: at(90.6), to: at(104.2), speed: 1.2, label: "His earnings" },
         caps: [{ t: "₹3,10,245 in October. His hands are working in kitchens across India.", x: .03, y: .78, w: 470, at: 5.4 }] },
       { id: "txt", x: 422, y: 555, w: 912, h: 189, text: `He no longer works full services.`, color: "#fbf4e2" },
     ],
@@ -114,7 +114,7 @@ const PAGES = [
       { id: "drone", x: 26, y: 26, w: 1308, h: 360, img: "p11-drone", caps: [{ t: "Day 2. The drone lands on the terrace.", x: .64, y: .76, w: 380, at: .6 }] },
       { id: "unbox", x: 26, y: 402, w: 400, h: 342, img: "p12-asha-unbox", caps: [{ t: "It's smaller than she expected.", x: .06, y: .06, w: 250, at: 4.6 }] },
       { id: "press", x: 442, y: 402, w: 270, h: 342, img: "p13-asha-patch", caps: [{ t: "A faint tingle.", x: .08, y: .78, w: 190, at: 7.8 }] },
-      { id: "s", x: 728, y: 402, w: 606, h: 342, screen: { from: at(161), to: at(174.5), speed: 1, label: "Setup" },
+      { id: "s", x: 728, y: 402, w: 606, h: 342, screen: { from: at(162.3), to: at(174.5), speed: 1, label: "Setup" },
         caps: [{ t: "She taps her phone on the box. Then she holds still while the patch learns her muscles.", x: .03, y: .04, w: 420, at: 10.8 }] },
     ],
     beats: [{ p: "drone", d: 4.6 }, { p: "unbox", d: 3.2 }, { p: "press", d: 3 }, { p: "s", d: 13.6 }, { p: "all", d: 2.2 }] },
@@ -147,8 +147,8 @@ const PAGES = [
 
   { part: "Part three · Both sides of one session", panels: [
       { id: "split", x: 26, y: 26, w: 1308, h: 420, img: "p16-split", caps: [{ t: "Mumbai and Pune. The same session.", x: .37, y: .05, w: 330, at: .6 }] },
-      { id: "s", x: 26, y: 462, w: 502, h: 282, screen: { from: at(255.5), to: at(268), speed: 1, label: "His phone" },
-        caps: [{ t: "Arjun's phone lights up: +₹416.", x: .04, y: .72, w: 300, at: 7 }] },
+      { id: "s", x: 26, y: 462, w: 502, h: 282, screen: { from: at(258.7), to: at(270), speed: 1, label: "His phone" },
+        caps: [{ t: "Arjun's phone lights up: <span style=\"white-space:nowrap\">+₹416.</span>", x: .04, y: .72, w: 400, at: 7 }] },
       { id: "txt", x: 544, y: 462, w: 790, h: 282, text: `A cook in Pune.<small>He will never know her name.</small>`, color: "var(--mustard)" },
     ],
     beats: [{ p: "split", d: 5 }, { p: "s", d: 12.6 }, { p: "txt", d: 3.4 }, { p: "all", d: 2.2 }] },
@@ -200,6 +200,7 @@ let acc = 0;
 for (const pg of PAGES) { pg.start = acc; acc += pg.dur + TURN; }
 const TOTAL = acc - TURN;
 window.__total = TOTAL;
+window.__pages = PAGES.map((pg) => ({ start: pg.start, dur: pg.dur }));
 
 const ease = (k) => (k < .5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2);
 const back = (k) => { const c = 1.7; return 1 + (c + 1) * Math.pow(k - 1, 3) + c * Math.pow(k - 1, 2); };
