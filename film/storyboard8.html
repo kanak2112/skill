@@ -49,6 +49,8 @@ const W = 1360, H = 770, VW = 1440, VH = 810, SX = 40, SY = 20, FPS = 30, TURN =
 const at = (s) => Math.round(s * FPS);
 const REEL = window.__reel; // { marks, values } from reel-marks.json
 const V = REEL.values;
+const pingMins = Math.round(parseInt(V.ping.replace(/\D/g, ''), 10) / 555 * 60);
+const pingSpan = pingMins === 60 ? 'an hour' : pingMins % 60 === 0 ? `${['', 'one', 'two', 'three', 'four'][pingMins / 60]} hours` : `${pingMins} minutes`;
 const R = (name, { speed = 1, skip = 0, end = 0 } = {}) => ({ src: "frames-reel", from: REEL.marks[name].from + at(skip), to: REEL.marks[name].to - at(end), speed });
 const A = (from, to, speed = 1) => ({ src: "frames-clean", from: at(from), to: at(to), speed });
 const scr = (clip, label) => ({ ...clip, label });
@@ -208,15 +210,8 @@ const PAGES = [
       { id: "strip", x: 26, y: 611, w: 1308, h: 133, text: `A retention licence would make it hers, legally. Arjun would get 30%.`, color: "#fbf4e2" },
     ], beats: [{ p: "s", d: 15.4 }, { p: "strip", d: 3 }, { p: "side", d: 2.4 }, { p: "all", d: 1.2 }] },
 
-  // ── Part three: both sides ──
-  { part: "Part three · Both sides of one session", panels: [
-      { id: "split", x: 26, y: 26, w: 1308, h: 420, img: "p16-split", caps: [{ t: "Mumbai and Pune. The same session.", x: .37, y: .05, w: 330, at: .6 }] },
-      { id: "s", x: 26, y: 462, w: 502, h: 282, screen: scr(R("ping", { speed: 1 }), "His phone"),
-        caps: [{ t: `Arjun's phone lights up: <span style="white-space:nowrap">+${V.ping}.</span>`, x: .04, y: .72, w: 400, at: 6.6 }] },
-      { id: "txt", x: 544, y: 462, w: 790, h: 282, text: `A cook in Pune.<small>He will never know her name.</small>`, color: "var(--mustard)" },
-    ], beats: [{ p: "split", d: 4.6 }, { p: "s", d: 9 }, { p: "txt", d: 3 }, { p: "all", d: 1.2 }] },
-
-  { panels: [
+  // ── Part three: weeks later ──
+  { part: "Part three · Weeks later", panels: [
       { id: "tremor", x: 26, y: 26, w: 1308, h: 400, img: "p24-asha-tremor", caps: [{ t: "Three sessions later.", x: .02, y: .05, w: 260, at: .6 }, { t: "Without the patch, her own hand isn't as steady as it was.", x: .6, y: .76, w: 440, at: 2.6 }] },
       { id: "s", x: 26, y: 442, w: 860, h: 302, screen: scr(R("debrief3", { speed: 1 }), "Her third debrief"),
         caps: [{ t: `Her own steadiness: ${V.steady}.`, x: .5, y: .06, w: 360, at: 11 }] },
@@ -224,9 +219,16 @@ const PAGES = [
     ], beats: [{ p: "tremor", d: 5.4 }, { p: "s", d: 10 }, { p: "t", d: 2.8 }, { p: "all", d: 1.2 }] },
 
   { panels: [
+      { id: "split", x: 26, y: 26, w: 1308, h: 420, img: "p16-split", caps: [{ t: "Her third session. Mumbai and Pune, the same two hours.", x: .37, y: .05, w: 380, at: .6 }] },
+      { id: "s", x: 26, y: 462, w: 502, h: 282, screen: scr(R("ping", { speed: 1 }), "His phone"),
+        caps: [{ t: `Arjun's phone lights up: <span style="white-space:nowrap">+${V.ping}.</span>`, x: .04, y: .72, w: 400, at: 6.6 }] },
+      { id: "txt", x: 544, y: 462, w: 790, h: 282, text: `A cook in Pune.<small>He will never know her name.</small>`, color: "var(--mustard)" },
+    ], beats: [{ p: "split", d: 4.6 }, { p: "s", d: 9 }, { p: "txt", d: 3 }, { p: "all", d: 1.2 }] },
+
+  { panels: [
       { id: "bill", x: 26, y: 26, w: 1308, h: 470, img: "p25-billboard", caps: [{ t: "Mumbai, that night.", x: .02, y: .05, w: 250, at: .6 }, { t: "The composite skill built partly from his hours is on every billboard. ₹340 an hour.", x: .62, y: .74, w: 440, at: 2.6 }] },
       { id: "job", x: 26, y: 512, w: 646, h: 232, text: `Asha gets the job.<small>Her employer can see every hour she streams.</small>`, color: "var(--mustard)" },
-      { id: "arj", x: 688, y: 512, w: 646, h: 232, text: `Arjun earns ${V.ping}<small>for ${V.mins} minutes he didn't work. His wrist aches.</small>`, color: "var(--teal)" },
+      { id: "arj", x: 688, y: 512, w: 646, h: 232, text: `Arjun earns ${V.ping}<small>for ${pingSpan} he didn't work. His wrist aches.</small>`, color: "var(--teal)" },
     ], beats: [{ p: "bill", d: 6.4 }, { p: "job", d: 3.4 }, { p: "arj", d: 3.4 }, { p: "all", d: 1.2 }] },
 
   // ── Epilogue ──
