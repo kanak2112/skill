@@ -51,7 +51,7 @@ const REEL = window.__reel; // { marks, values } from reel-marks.json
 const V = REEL.values;
 const pingMins = Math.round(parseInt(V.ping.replace(/\D/g, ''), 10) / 555 * 60);
 const pingSpan = pingMins === 60 ? 'an hour' : pingMins % 60 === 0 ? `${['', 'one', 'two', 'three', 'four'][pingMins / 60]} hours` : `${pingMins} minutes`;
-const R = (name, { speed = 1, skip = 0, end = 0 } = {}) => ({ src: "frames-reel", from: REEL.marks[name].from + at(skip), to: REEL.marks[name].to - at(end), speed });
+const R = (name, { speed = 1, skip = 0, end = 0 } = {}) => ({ src: "frames-reel", from: REEL.marks[name].from + at(skip), to: REEL.marks[name].to - 1 - at(end), speed });
 const A = (from, to, speed = 1) => ({ src: "frames-clean", from: at(from), to: at(to), speed });
 const scr = (clip, label) => ({ ...clip, label });
 const PAGES = [
