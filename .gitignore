@@ -11,3 +11,6 @@ film/board-frames/
 film/board-test/
 film/panels/*.png
 film/*.jpg
+film/frames-reel/
+film/dry-reel/
+film/rs_*.jpg

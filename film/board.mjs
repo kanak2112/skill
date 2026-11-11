@@ -12,11 +12,12 @@ mkdirSync(OUT, { recursive: true });
 const b = await chromium.launch();
 const p = await b.newPage({ viewport: { width: 1440, height: 810 }, deviceScaleFactor: 4 / 3 });
 const errs = []; p.on('pageerror', (e) => errs.push(e.message)); p.on('console', (m) => m.type() === 'error' && errs.push(m.text()));
-await p.goto(`http://localhost:${process.env.PORT || 5302}/storyboard.html${process.env.SRC ? `?src=${process.env.SRC}` : ''}`, { waitUntil: 'load' });
+await p.goto(`http://localhost:${process.env.PORT || 5302}/${process.env.PAGE || 'storyboard.html'}${process.env.SRC ? `?src=${process.env.SRC}` : ''}`, { waitUntil: 'load' });
 await p.evaluate(async () => {
   await Promise.all(['400 40px Bangers', '700 20px "Comic Neue"', '400 20px "Comic Neue"', '500 20px "Google Sans Flex"'].map((f) => document.fonts.load(f, 'ABC ₹')));
   await document.fonts.ready;
 });
+await p.evaluate(() => window.__ready);
 const total = await p.evaluate(() => window.__total);
 const N = Math.ceil(total * 30);
 const from = Math.floor((N * SHARD) / SHARDS), to = Math.floor((N * (SHARD + 1)) / SHARDS);
