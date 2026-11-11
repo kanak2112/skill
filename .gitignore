@@ -6,3 +6,8 @@ film/.libs
 film/frames/
 film/dry/
 film/*.mp4
+film/frames-clean/
+film/board-frames/
+film/board-test/
+film/panels/*.png
+film/*.jpg

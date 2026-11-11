@@ -6,7 +6,9 @@ import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
 const DIR = new URL('.', import.meta.url).pathname;
 const FPS = 30;
 const DRY = !!process.env.DRY;
-const OUT = DIR + (DRY ? 'dry/' : 'frames/');
+// CLEAN=1 renders the same film without captions or vignette, for footage inside storyboard panels.
+const CLEAN = !!process.env.CLEAN;
+const OUT = DIR + (DRY ? 'dry/' : CLEAN ? 'frames-clean/' : 'frames/');
 // Sharding: SHARD=k of SHARDS=n replays the whole story but saves only frames in its slice,
 // so several browsers can render one film in parallel.
 const SHARDS = +process.env.SHARDS || 1, SHARD = +process.env.SHARD || 0, TOTAL = +process.env.TOTAL || 12500;
@@ -38,7 +40,7 @@ async function settle(ms) { for (let t = 0; t < ms; t += 100) await adv(100); }
 async function cap(text) {
   if (capOpen) { capOpen.end = frame; subs.push(capOpen); capOpen = null; }
   if (text) capOpen = { start: frame, text };
-  await p.evaluate((t) => window.__cap(t), text || '');
+  if (!CLEAN) await p.evaluate((t) => window.__cap(t), text || '');
 }
 async function card(c, seconds) {
   await cap(null);
@@ -101,7 +103,7 @@ const nav = (label) => `nav[aria-label="Main"] button:has-text("${label}")`;
 // ── Load and warm up (not recorded) ──
 await settle(400);
 for (let i = 0; i < 300 && !(await p.evaluate(() => document.querySelector('#root') && document.querySelector('#root').children.length)); i++) await settle(100);
-await p.evaluate(() => { localStorage.clear(); window.__mountFilm(); window.__card({ eyebrow: '', title: '' }); });
+await p.evaluate((clean) => { localStorage.clear(); window.__mountFilm(); window.__card({ eyebrow: '', title: '' }); if (clean) document.getElementById('film-vignette').style.display = 'none'; }, CLEAN);
 await settle(900);
 await p.keyboard.press('p'); await settle(2500);
 for (let i = 0; i < 60; i++) await adv(1000 / FPS);
