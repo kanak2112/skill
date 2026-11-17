@@ -248,11 +248,6 @@ function patchCanvas() {
   tex.anisotropy = 4;
   return tex;
 }
-const b64ToBuffer = (b64) => {
-  const bin = atob(b64), out = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-  return out.buffer;
-};
 
 /* Camera framings. `dir` is where the camera sits relative to the target; `dist` scales the base distance.
    Temple and neck aim straight at the shell; forearm pulls back to show the raised arm. */
@@ -278,7 +273,7 @@ function HeadStage({ shape, color, coating, node, autoTurn, photo, frame, hero =
 
   useEffect(() => {
     const el = mount.current;
-    if (!window.THREE || !THREE.GLTFLoader || !window.__HEAD) { setStatus("error"); return; }
+    if (!window.THREE || !window.__HEAD) { setStatus("error"); return; }
     let renderer;
     try { renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true }); } catch { setStatus("error"); return; }
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
@@ -408,12 +403,17 @@ function HeadStage({ shape, color, coating, node, autoTurn, photo, frame, hero =
     api.current.setPhoto = setPhoto;
 
     const head64 = window.__HEAD;
-    new THREE.GLTFLoader().parse(b64ToBuffer(head64.model), "", (gltf) => {
-      if (disposed) return;
+    // The head mesh ships as plain arrays (positions, normals, UVs, triangle indices).
+    const buildHead = () => {
       const tl = new THREE.TextureLoader();
       const col = tl.load(head64.color); col.encoding = THREE.sRGBEncoding;
       const nrm = tl.load(head64.normal);
-      head = gltf.scene.getObjectByProperty("type", "Mesh");
+      const geo = new THREE.BufferGeometry(), m = head64.mesh;
+      geo.setAttribute("position", new THREE.Float32BufferAttribute(m.position, 3));
+      geo.setAttribute("normal", new THREE.Float32BufferAttribute(m.normal, 3));
+      geo.setAttribute("uv", new THREE.Float32BufferAttribute(m.uv, 2));
+      geo.setIndex(m.index);
+      head = new THREE.Mesh(geo);
       const skin = { roughness: 0.52, metalness: 0, sheen: 0.4, sheenRoughness: 0.6, sheenColor: new THREE.Color("#ffd7c2"), envMapIntensity: 0.35 };
       head.material = new THREE.MeshPhysicalMaterial({ map: col, normalMap: nrm, normalScale: new THREE.Vector2(0.8, 0.8), ...skin });
       // Blend the uploaded photo onto the front of the face: planar projection from the front,
@@ -499,7 +499,8 @@ function HeadStage({ shape, color, coating, node, autoTurn, photo, frame, hero =
       setStatus("ready");
       apply();
       setPhoto(api.current.photo);
-    }, () => { if (!disposed) setStatus("error"); });
+    };
+    try { buildHead(); } catch (e) { console.error(e); setStatus("error"); }
 
     const toCam = new THREE.Vector3();
     const ease = (t) => 1 - Math.pow(1 - t, 3);
